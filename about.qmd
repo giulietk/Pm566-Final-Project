@@ -1,7 +1,5 @@
 ---
-title: "About"
+title: "Download Full Report"
 ---
 
-About this site
-
-This is PM 566's Final Porject website
+Download html here: 
