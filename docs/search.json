@@ -2,9 +2,9 @@
   {
     "objectID": "index.html",
     "href": "index.html",
-    "title": "Website",
+    "title": "Final Project",
     "section": "",
-    "text": "Edits by K Siegmund"
+    "text": "This project reviews the dietary intake over the 24-hour period prior to the interview of Americans 1 year or older between 2017 and March of 2020, as collected in the National Health and Nutrition Examination Survey is a survey. This data set includes dietary information from the first interview and is a log of the total energy and nutrient intakes, including the macronutrients (carbohydrates, fats, and proteins) and vitamins, from foods and beverages within the previous 24-hours. The project analyzes whether participants intended diet (macronutrient dietary intention) aligns with their actual food consumption (dietary intake). Additionally, it assesses the relationship between dietary intake and the B vitamins intake. B vitamins are cofactors for many cellular pathways, including cellular metabolism and synthesis of DNA and RNA, but are not stored by the body, so it is critical to replenish them daily through foods and supplements (Hanna et al, 2022). Therefore, this analysis is to assess if Americans 1 year or older are eating their intended macronutrient diet and if their intake is associated with B vitamin levels pre-pandemic (2017-March 2020)."
   },
   {
     "objectID": "about.html",
