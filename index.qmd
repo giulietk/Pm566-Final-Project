@@ -21,6 +21,7 @@ library(tidyr)
 library(rsconnect)
 library(ggiraph)
 library(htmltools)
+library(plotly)
 
 # Load in data
 data <- read_xpt("P_DR1TOT.XPT")
@@ -181,22 +182,21 @@ Red dashed lines are used to represent the recommended B vitamins intake levels 
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # Recreate figure 5
-create_scatter_plots <- function(data) {
+create_scatter_plots_data <- function(data) {
   nutrient_vars <- c("Calories", "Carbohydrate", "Fat", "Protein")
   vitamin_vars <- c("B1", "B2", "B6")
-  recommended_values <- list(B1 = 1.2, B2 = 1.3, B6 = 1)
   
-  plot_list <- list()  # To store multiple plots
+  recommended_values <- list(
+    B1 = 1.2,
+    B2 = 1.3,
+    B6 = 1
+  )
   
-  # Loop through each vitamin to create separate grids
+  plot_data_list <- list()
+  
   for (vitamin in vitamin_vars) {
-    plot_data_list <- list()
-    
     for (nutrient in nutrient_vars) {
-      if (!nutrient %in% colnames(data)) {
-        next
-      }
-      
+      if (!nutrient %in% colnames(data)) next
       if (vitamin %in% colnames(data)) {
         temp_data <- data[, c(nutrient, vitamin)]
         colnames(temp_data) <- c("Nutrient", "Vitamin")
@@ -209,71 +209,24 @@ create_scatter_plots <- function(data) {
           model <- lm(Vitamin ~ Nutrient, data = temp_data)
           r_squared <- summary(model)$r.squared
           
-          plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
-            Nutrient = temp_data$Nutrient,
-            Vitamin = temp_data$Vitamin,
-            Vitamin_Name = vitamin,
-            Nutrient_Name = nutrient,
-            Recommended_Value = recommended_values[[vitamin]],
-            R_squared = r_squared
+          plot_data_list[[length(plot_data_list) + 1]] <- list(
+            nutrient = nutrient,
+            vitamin = vitamin,
+            data = temp_data,
+            recommended_value = recommended_values[[vitamin]],
+            r_squared = r_squared
           )
         }
       }
     }
-    
-    plot_data <- bind_rows(plot_data_list)
-    
-    scatter_plot <- ggplot(plot_data, aes(x = Nutrient, y = Vitamin)) +
-      geom_point(aes(color = Nutrient_Name), alpha = 0.7) +
-      geom_smooth(method = "lm", se = FALSE, color = "blue") +
-      labs(x = "Dietary Intake", y = "B Vitamin Level") +
-      theme_minimal() +
-      facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +
-      theme(legend.title = element_blank(), strip.text = element_text(size = 12)) +
-      ggtitle(paste(vitamin, "Levels vs Dietary Intake")) +
-      geom_hline(data = plot_data, aes(yintercept = Recommended_Value),
-                 linetype = "dashed", color = "red", linewidth = 0.7) +
-      geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))),
-                hjust = 1.1, vjust = 1.1, color = "black", size = 4, fontface = "italic") +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
-    
-    interactive_plot <- ggplotly(scatter_plot)
-    plot_list[[vitamin]] <- interactive_plot
   }
   
-  return(plot_list)
+  # Save the data as JSON to use in JavaScript
+  jsonlite::write_json(plot_data_list, "scatter_plot_data.json")
 }
 
-# Shiny UI
-ui <- fluidPage(
-  titlePanel("Interactive Nutrient vs Vitamin Levels"),
-  sidebarLayout(
-    sidebarPanel(
-      selectInput("vitamin", "Select Vitamin", choices = c("B1", "B2", "B6")),
-      width = 3
-    ),
-    mainPanel(
-      plotlyOutput("scatter_plot"),  # Placeholder for interactive plot
-      width = 9
-    )
-  )
-)
-
-# Shiny Server
-server <- function(input, output) {
-  
-  # Generate interactive plots based on selected vitamin
-  plot_data <- create_scatter_plots(extracted_data)
-  
-  # Render the selected vitamin's plot
-  output$scatter_plot <- renderPlotly({
-    selected_vitamin <- input$vitamin
-    plot_data[[selected_vitamin]]
-  })
-}
-
-# Run the Shiny app
-shinyApp(ui = ui, server = server)
+# Call function to create the data and save to JSON
+create_scatter_plots_data(extracted_data)
 ```
 
 ## Association between caloric diet and B vitamin levels
