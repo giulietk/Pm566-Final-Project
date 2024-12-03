@@ -15,16 +15,93 @@ library(ggplot2)
 library(plotly)
 library(dplyr)
 library(knitr)
+library(haven)
+library(gridExtra)
+library(tidyr)
+library(rsconnect)
+library(ggiraph)
+
+# Load in data
+data <- read_xpt("P_DR1TOT.XPT")
+
+# Calculations
+# Impute multiple columns at once
+data_avgs <- data |>
+  summarise(
+    Calories = median(DR1TKCAL, na.rm = TRUE),
+    Sugar = median(DR1TSUGR, na.rm = TRUE),
+    Carbohydrate = median(DR1TCARB, na.rm = TRUE),
+    Fat = median(DR1TTFAT, na.rm = TRUE),
+    Protein = median(DR1TPROT, na.rm = TRUE),
+    B1 = median(DR1TVB1, na.rm = TRUE),
+    B2 = median(DR1TVB2, na.rm = TRUE),
+    B6 = median(DR1TVB6, na.rm = TRUE))
+kable(data_avgs, caption = "Total Median Caloric (cal), Macronutrient (g) and B Vitamin Intake Levels (mg)")
+# Create categorical variables
+high_low <- data |>
+  mutate(
+    low_Calories = ifelse(DR1TKCAL < as.numeric(data_avgs['Calories']), 1, 0),
+    low_Sugar = ifelse(DR1TSUGR < as.numeric(data_avgs['Sugar']),1, 0),
+    low_Carbohydrate = ifelse(DR1TCARB < as.numeric(data_avgs['Carbohydrate']), 1, 0),
+    low_Fat = ifelse(DR1TTFAT < as.numeric(data_avgs['Fat']), 1, 0),
+    low_Protein = ifelse(DR1TPROT < as.numeric(data_avgs['Protein']), 1, 0)
+  ) |>
+  select(starts_with("low_") | starts_with("high_"))  # Keep only the categorical columns
+print(high_low)
+# Extract data to answer questions
+extracted_data <- data |>
+  select(DR1TKCAL, DRQSDT1, DRQSDT8, DR1TSUGR, DRQSDT4, DR1TCARB, DRQSDT9, DR1TTFAT, DRQSDT2, DR1TPROT, DRQSDT10, DR1TVB1, DR1TVB2, DR1TVB6) |>
+  rename(
+    Calories = DR1TKCAL,
+    Low_Calorie = DRQSDT1, # Low cal diet
+    High_Calorie = DRQSDT8, # Weight gain diet
+    Sugar = DR1TSUGR,
+    Low_Sugar = DRQSDT4, # Low sugar diet
+    Carbohydrate = DR1TCARB,
+    Low_Carbohydrate = DRQSDT9, # Low carb diet
+    Fat = DR1TTFAT,
+    Low_Fat = DRQSDT2, # Low fat diet
+    Protein = DR1TPROT,
+    High_Protein = DRQSDT10, # High Protein diet
+    # Vitamin Bs
+    B1 = DR1TVB1, # Vitamin B1
+    B2 = DR1TVB2, # Vitamin B2
+    B6 = DR1TVB6 # Vitamin B6
+  )
+
+# Edit dietary output
+extracted_data[c("Low_Calorie", "High_Calorie", "Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")] <- 
+  lapply(extracted_data[c("Low_Calorie", "High_Calorie", "Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")], function(x) {
+    x[is.na(x)] <- 0 # Replace NA values with 0
+    x[x != 0] <- 1 # Replace values other than 0 with 1
+    return(x)
+  })
+
+# Make a new variable for diet type
+extracted_data <- extracted_data |>
+  mutate(Calorie_diet = case_when(
+    Low_Calorie == 1 ~ 0,
+    High_Calorie == 1 ~ 1,
+    TRUE ~ 2  # Assign NA if neither condition is met
+  ))
 ```
 
 This project reviews the dietary intake over the 24-hour period prior to the interview of Americans 1 year or older between 2017 and March of 2020, as collected in the National Health and Nutrition Examination Survey is a survey. This data set includes dietary information from the first interview and is a log of the total energy and nutrient intakes, including the macronutrients (carbohydrates, fats, and proteins) and vitamins, from foods and beverages within the previous 24-hours. The project analyzes whether participants intended diet (macronutrient dietary intention) aligns with their actual food consumption (dietary intake). Additionally, it assesses the relationship between dietary intake and the B vitamins intake. B vitamins are cofactors for many cellular pathways, including cellular metabolism and synthesis of DNA and RNA, but are not stored by the body, so it is critical to replenish them daily through foods and supplements (Hanna et al, 2022). Therefore, this analysis is to assess if Americans 1 year or older are eating their intended macronutrient diet and if their intake is associated with B vitamin levels pre-pandemic (2017-March 2020).
 
-```{r,, echo=FALSE, message=FALSE, warning=FALSE}
-# Recreation of Figure 3
+## Distribution of macronutrient intake by diet type
+
+The low sugar group averaged lower total sugars than those not on the diet (62.24 vs 90.89 g). Additionally, the low carbohydrate group ate less carbohydrates than those not on this diet (165.395 vs 219.08 g). On the other hand, those on a low fat diet ate more fats than those not on the diet (72.62 vs 71.805 g), meaning the average participant on a low fat diet did not eat less fats than other participants. The average high protein diet had substantially more protein intake than those not on the diet (100.61 vs 64.72 g). Therefore, participants on a low sugar, low carbohydrate, or high protein diet stuck to their diet, while those on a low fat diet did not.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Recreation of figure 3
+# Create interactive plots for each diet and nutrient combination
+plots <- list()
+
+# Function to create the summary plot with custom x-axis labels
 create_summary_plot <- function(data, cat_var, cont_var) {
   # Convert the categorical variable to a factor
   data[[cat_var]] <- as.factor(data[[cat_var]])
-  filtered_data <- data %>% filter(is.finite(!!sym(cont_var)))
+  filtered_data <- data |> filter(is.finite(!!sym(cont_var)))
 
   # Create a mapping for human-readable titles
   title_map <- c(
@@ -37,87 +114,261 @@ create_summary_plot <- function(data, cat_var, cont_var) {
   # Create the box plot with color based on the categorical variable
   box_plot <- ggplot(filtered_data, aes_string(x = cat_var, y = cont_var, fill = cat_var)) +
     geom_boxplot() +
-    labs(x = paste(title_map[cat_var], "(yes/no)"), y = cont_var) +  # Use mapped title for x-axis label
+    labs(x = paste(title_map[cat_var], "(Yes/No)"), y = cont_var) +  # Use mapped title for x-axis label
     ggtitle(paste(cont_var, "Intake for", title_map[cat_var], "Diet Intention")) +  # Use mapped title for plot title
     theme_minimal() +
     scale_fill_manual(values = c("lightblue", "lightgreen")) +
+    scale_x_discrete(labels = c("No", "Yes")) +  # Custom labels for x-axis (0 -> No, 1 -> Yes)
     theme(legend.position = "none")
-
-  # Create the summary table
-  summary_table <- data %>%
-    group_by(!!sym(cat_var)) %>%
-    summarize(
-      Mean = mean(!!sym(cont_var), na.rm = TRUE),
-      Median = median(!!sym(cont_var), na.rm = TRUE),
-      Min = min(!!sym(cont_var), na.rm = TRUE),
-      Max = max(!!sym(cont_var), na.rm = TRUE),
-      Count = n(),
-      .groups = 'drop'
-    )
-
-  # Return the plot and summary table separately
-  return(list(plot = box_plot, summary_table = summary_table))
+  
+  # Return the plot
+  return(box_plot)
 }
 
-# Sample data (replace this with your actual dataset)
-# For demonstration, let's create a sample dataset
-set.seed(123)
-extracted_data <- data.frame(
-  Low_Sugar = sample(c(0, 1), 100, replace = TRUE),
-  Low_Carbohydrate = sample(c(0, 1), 100, replace = TRUE),
-  Low_Fat = sample(c(0, 1), 100, replace = TRUE),
-  High_Protein = sample(c(0, 1), 100, replace = TRUE),
-  Sugar = rnorm(100, 10, 2),
-  Carbohydrate = rnorm(100, 50, 10),
-  Fat = rnorm(100, 20, 5),
-  Protein = rnorm(100, 30, 7)
-)
+# Low Sugar vs Sugar Intake
+result_sugar <- create_summary_plot(extracted_data, "Low_Sugar", "Sugar")
+plots$Low_Sugar_Sugar <- ggplotly(result_sugar)
 
-# Define the UI for the app
-ui <- fluidPage(
-  titlePanel("Interactive R Diet Intake Analysis"),
-  
-  sidebarLayout(
-    sidebarPanel(
-      selectInput("diet", "Select Diet Type:",
-                  choices = c("Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")),
-      selectInput("nutrient", "Select Nutrient:",
-                  choices = c("Sugar", "Carbohydrate", "Fat", "Protein"))
-    ),
-    
-    mainPanel(
-      plotlyOutput("boxPlot"),
-      tableOutput("summaryTable")
-    )
+# Low Carbohydrate vs Carbohydrate Intake
+result_carb <- create_summary_plot(extracted_data, "Low_Carbohydrate", "Carbohydrate")
+plots$Low_Carb_Carb <- ggplotly(result_carb)
+
+# Low Fat vs Fat Intake
+result_fat <- create_summary_plot(extracted_data, "Low_Fat", "Fat")
+plots$Low_Fat_Fat <- ggplotly(result_fat)
+
+# High Protein vs Protein Intake
+result_protein <- create_summary_plot(extracted_data, "High_Protein", "Protein")
+plots$High_Protein_Protein <- ggplotly(result_protein)
+
+# Display all plots
+plots$Low_Sugar_Sugar
+plots$Low_Carb_Carb
+plots$Low_Fat_Fat
+plots$High_Protein_Protein
+```
+
+## Distribution of caloric intake
+
+The median high calorie diet included substantially higher caloric intake than either the low calorie diet or those not on a caloric diet (2528 vs 1834 and 1821 cals, respectively), meaning participants intending to eat high amonts of calories are following their dietary plan. On the other hand, the low calorie diet had a slightly higher median than those not on a caloric diet (1834 vs 1821 cals), meaning the average participant on a low calorie diet actually ate more calories than those not intending to calorically restrict and were not following their intended diet.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Recreating figure 4
+plot <- ggplot(na.omit(extracted_data), aes(x = factor(Calorie_diet), y = Calories, fill = factor(Calorie_diet))) +
+  geom_boxplot(alpha = 0.7) +
+  labs(x = "Diet Type", y = "Calories", title = "Calories by Diet Type") +
+  scale_x_discrete(labels = c("0" = "Low Calorie Diet", "1" = "High Calorie Diet", "2" = "Neither")) +
+  scale_fill_manual(values = c("lightblue", "lightgreen", "salmon")) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",  # Remove the legend
+    legend.title = element_blank()  # Remove legend title, if present
   )
-)
 
-# Define the server logic
-server <- function(input, output) {
+# Convert the ggplot to a plotly object for interactivity
+interactive_plot <- ggplotly(plot)
+
+# Display the interactive plot
+interactive_plot
+```
+
+## Association between B vitamins and nutritional intake
+
+Linear regressions are fit for each caloric diet type to answer the question of whether diet impact B vitamin intake. B1 and B2 vitamins are more strongly associated (highest correlation value of 0.32 to 0.48 and 0.31 to 0.42, respectively) with all of the macronutrient intakes than B6 (correlation of 0.14 to 0.28), with the highest correlation occurring between B1 and caloric intake (0.48) an B1 and carbohydrate intake (0.45). Overall, this demonstrates that getting enough dietary nutrition is critical for B1 and B2 vitamin daily replenishment.
+
+Red dashed lines are used to represent the recommended B vitamins intake levels for men of 1.2 mg of B1, 1.3 miligrams (mg) of B2 and 1 mg of B6.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+create_interactive_scatter_plots <- function(data) {
+  # List of nutrient variables to plot
+  nutrient_vars <- c("Calories", "Carbohydrate", "Fat", "Protein")
   
-  # Reactive expression to generate plot and summary
-  reactive_plot_data <- reactive({
-    create_summary_plot(extracted_data, input$diet, input$nutrient)
-  })
+  # List of vitamin variables to plot against
+  vitamin_vars <- c("B1", "B2", "B6")
   
-  # Render the plotly box plot
-  output$boxPlot <- renderPlotly({
-    plot_data <- reactive_plot_data()
+  # Define recommended values for B vitamins
+  recommended_values <- list(
+    B1 = 1.2,
+    B2 = 1.3,
+    B6 = 1
+  )
+  
+  # Loop through each vitamin to create separate grids
+  for (vitamin in vitamin_vars) {
+    # Prepare an empty list to store the plot data for this vitamin
+    plot_data_list <- list()
     
-    # Convert the ggplot object to plotly for interactivity
-    ggplotly(plot_data$plot)
-  })
-  
-  # Render the summary table
-  output$summaryTable <- renderTable({
-    plot_data <- reactive_plot_data()
+    # Loop through each nutrient variable
+    for (nutrient in nutrient_vars) {
+      # Check if the nutrient exists in the data
+      if (!nutrient %in% colnames(data)) {
+        message(paste("Nutrient variable", nutrient, "not found in the data. Skipping."))
+        next
+      }
+      
+      # Check if vitamin exists in the data
+      if (vitamin %in% colnames(data)) {
+        # Prepare the data for modeling
+        temp_data <- data[, c(nutrient, vitamin)]
+        colnames(temp_data) <- c("Nutrient", "Vitamin")
+        
+        # Filter out missing and non-finite values, but retain some data for the plot
+        temp_data <- temp_data %>%
+          filter(!is.na(Nutrient) & !is.na(Vitamin)) %>%
+          filter(is.finite(Nutrient) & is.finite(Vitamin))
+        
+        # Check if there are enough data points for modeling
+        if (nrow(temp_data) > 1) {
+          # Fit a linear model and calculate R^2
+          model <- lm(Vitamin ~ Nutrient, data = temp_data)
+          r_squared <- summary(model)$r.squared
+          
+          # Add the necessary data for plotting, including the recommended values and R^2
+          plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
+            Nutrient = temp_data$Nutrient,
+            Vitamin = temp_data$Vitamin,
+            Vitamin_Name = vitamin,
+            Nutrient_Name = nutrient,
+            Recommended_Value = recommended_values[[vitamin]],
+            R_squared = r_squared
+          )
+        } else {
+          message(paste("Not enough data points for", vitamin, "vs", nutrient))
+        }
+      } else {
+        message(paste("Vitamin variable", vitamin, "not found in the data. Skipping."))
+      }
+    }
     
-    # Render the summary table
-    kable(plot_data$summary_table, caption = "Summary Statistics", 
-          col.names = c("Diet Type", "Mean", "Median", "Min", "Max", "Count"))
-  })
+    # Combine all the data for this vitamin into a single data frame
+    plot_data <- bind_rows(plot_data_list)
+    
+    # Check if plot_data is empty
+    if (nrow(plot_data) == 0) {
+      message(paste("No data available for vitamin", vitamin, "after filtering. Skipping this vitamin."))
+      next  # Skip to the next vitamin
+    }
+    
+    # Create the scatter plot for this vitamin using facet_wrap
+    scatter_plot <- ggplot(plot_data, aes(x = Nutrient, y = Vitamin)) +
+      geom_point_interactive(aes(color = Nutrient_Name, tooltip = paste("Nutrient:", Nutrient, "\nVitamin:", Vitamin))) + 
+      geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Line of best fit
+      labs(x = "Dietary Intake", y = "B Vitamin Level") +
+      theme_minimal() +
+      facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +  # Free x-scale for each plot
+      theme(legend.title = element_blank(), strip.text = element_text(size = 12)) +
+      ggtitle(paste(vitamin, "Levels vs Dietary Intake")) +
+      # Add the recommended value horizontal lines for each vitamin
+      geom_hline(data = plot_data, aes(yintercept = Recommended_Value),
+                 linetype = "dashed", color = "red", linewidth = 0.7) +
+      # Annotate the R^2 value on each plot
+      geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))), 
+                hjust = 1.1, vjust = 1.1, color = "black", size = 4, 
+                fontface = "italic") +
+      # Adjust x-axis text for readability
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+    
+    # Print the interactive scatter plot for this vitamin using girafe()
+    interactive_plot <- girafe(ggobj = scatter_plot)
+    
+    # Explicitly print the plot
+    print(interactive_plot)
+  }
 }
 
-# Run the application
-shinyApp(ui = ui, server = server)
+# Call the function with your data (ensure `extracted_data` is a valid dataframe)
+create_interactive_scatter_plots(extracted_data)
+```
+
+## Association between caloric diet and B vitamin levels
+
+Given that dietary nurtirion correlated with B vitamin levels, it is useful to know if the intention of dietary consumption is also correlated with B vitamin levels.
+
+Overall, B vitamins have a mild-to-moderate association with dietary intake. The high calorie diet in the graphs of vitamins B1 and B2 vs calories have the highest slopes, indicating that an intention to eat more calories is also associated with an increase in B vitamin intake. This finding makes sense given participants on a high calorie diet actually eat more calories and caloric intake was shown to be moderately associated with these B vitamin levels. Interestingly, caloric diet type's association with the B vitamins was not consistent between the vitamins, indicating that more than just than dietary intention is necessary for sufficient B vitamin intake.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+create_interactive_vitamin_plots <- function(data) {
+  # Prepare plot data from the dataset
+  plot_data <- data[, c("Calories", "B1", "B2", "B6", "Low_Calorie", "High_Calorie", "Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")]
+  
+  # Create a new column for DietType based on the diet indicators
+  plot_data$DietType <- 2  # Default to 2 (No Diet)
+  
+  # Assign values for DietType based on conditions
+  plot_data$DietType[plot_data$Low_Calorie == 1] <- 0
+  plot_data$DietType[plot_data$High_Calorie == 1] <- 1
+  
+  # Convert DietType to a factor
+  plot_data$DietType <- factor(plot_data$DietType, levels = c(0, 1, 2), labels = c("Low Diet", "High Diet", "No Diet"))
+  
+  # Filter out missing values
+  plot_data <- na.omit(plot_data)
+  
+  # List of vitamins to plot against Calories
+  vitamin_vars <- c("B1", "B2", "B6")
+  
+  # Color mapping for Diet Types
+  color_map <- c("Low Diet" = "red", "High Diet" = "blue", "No Diet" = "grey")
+  
+  # Create scatter plots for each vitamin
+  for (vitamin in vitamin_vars) {
+    # Initialize the plot with ggplot2
+    scatter_plot <- ggplot(plot_data, aes_string(x = "Calories", y = vitamin, color = "DietType")) +
+      geom_point_interactive(aes(tooltip = paste("Calories:", Calories, "\nVitamin:", vitamin, "\nDiet Type:", DietType))) +  # Tooltip for interactivity
+      geom_smooth(method = "lm", aes(group = DietType), se = FALSE) +  # Linear model for each diet type
+      labs(x = "Calories", y = paste("Vitamin", vitamin, "(mg)"), title = paste("Scatter Plot of Calories vs Vitamin", vitamin, "by Caloric Diet Type")) +
+      theme_minimal() +
+      scale_color_manual(values = color_map) +
+      theme(legend.title = element_blank())
+    
+    # Initialize y_pos adjustments for each diet type
+    y_pos_adjustments <- list(
+      "Low Diet" = 0.45,  # Adjust this for Low Diet
+      "High Diet" = 0.375,  # Adjust this for High Diet
+      "No Diet" = 0.3    # Adjust this for No Diet
+    )
+    
+    # Create an empty list to store text annotations for each diet type
+    text_annotations <- list()
+    
+    # Calculate and display R² values
+    for (diet in levels(plot_data$DietType)) {
+      # Fit the model for each diet type
+      model <- lm(as.formula(paste(vitamin, "~ Calories")), data = plot_data[plot_data$DietType == diet, ])
+      r_squared <- summary(model)$r.squared
+      
+      # Calculate y position based on the maximum vitamin level and adjustment factor
+      max_y <- max(plot_data[[vitamin]], na.rm = TRUE)
+      y_pos <- max_y * y_pos_adjustments[[diet]]
+      
+      # Add the R² value to the text annotations list
+      text_annotations[[diet]] <- list(
+        x = max(plot_data$Calories, na.rm = TRUE) * 0.9,  # Place the text towards the right of the plot
+        y = y_pos,
+        label = paste("R² =", round(r_squared, 3)),
+        color = color_map[diet]
+      )
+      
+      # Adjust the y position for the next diet type to avoid overlap
+      y_pos_adjustments[[diet]] <- y_pos_adjustments[[diet]] - 0.05  # Slight downward shift for the next annotation
+    }
+    
+    # Add text annotations to the plot
+    for (annotation in text_annotations) {
+      scatter_plot <- scatter_plot +
+        annotate("text", x = annotation$x, y = annotation$y, 
+                 label = annotation$label, color = annotation$color, 
+                 hjust = 1, vjust = 1)
+    }
+    
+    # Create the interactive plot using girafe
+    interactive_plot <- girafe(ggobj = scatter_plot)
+    
+    # Explicitly print the interactive plot
+    print(interactive_plot)
+  }
+}
+
+# Call the function with your data (ensure `extracted_data` is a valid dataframe)
+create_interactive_vitamin_plots(extracted_data)
 ```

@@ -1,0 +1,578 @@
+---
+title: "PM 566 Final Project"
+author: "Giuliet Kibler"
+format: 
+ html: 
+    embed-resources: true
+editor: visual
+---
+
+## Pre-Covid American Dietary Intention and B Vitamins
+
+# Introduction
+
+The National Health and Nutrition Examination Survey is a survey, typically conducted over a two-year period, to estimate the dietary intake over the 24-hour period prior to the interview of Americans 1 year or older. This particular dataset is a combination of data collected in the 2017-2018 cycle and 2019-March 2020 since the NHANES program was suspended in March of 2020 due to the COVID-19 pandemic. The dietary interview component of this survey is called "What We Eat in America" (WWEIA) and data is collected using the USDA's Automated Multiple Pass Method (AMPM). All participants are eligible for two survey interviews, the first of which is recorded in person at the Mobile Examination Center, and the second is conducted over the phone 3 to 10 days later. This data set includes dietary information from the first interview and is a log of the total energy and nutrient intakes, including the macronutrients (carbohydrates, fats, and proteins) and vitamins, from foods and beverages within the previous 24-hours. Of particular interest in this dataset is whether participants intended diet (macronutrient dietary intention) aligns with their actual food consumption (dietary intake). Additionally, there is interest in assessing the relationship between dietary intake and the B vitamins intake. B vitamins are cofactors for many cellular pathways, including cellular metabolism and synthesis of DNA and RNA, but are not stored by the body, so it is critical to replenish them daily through foods and supplements (Hanna et al, 2022). Therefore, this analysis is to assess if Americans 1 year or older are eating their intended macronutrient diet and if their intake is associated with B vitamin levels pre-pandemic (2017-March 2020).
+
+# Methods
+
+The P_DR1TOT dataset for 2017-March 2020 was downloaded from the CDC's NHANES records of dietary data. This is a dataset from the WWEIA day 1 interviews, conducted between 2017 and March of 2020, and includes total dietary intake of participants.
+
+Data variables of interest include 6 variables of special diets, referred to here as intended diet, 5 energy (caloric) and macronutrient variables, and B vitamins 1, 2, and 6. These variables were extracted from the dataset and relabeled to be more informative. 12 intended diets were recorded in separate variables as numbers 1-12 for yes to that diet or missing for no. These variables were altered to 1 for yes and 0 for no. Since low calorie and high calorie diets are labeled separately, a new variable for diet was created where low calorie is 0, high calorie is 1, and neither is 2.
+
+Correlation between intended macronutrient or caloric diet and true dietary intake was assessed using summary statistics and box plots.
+
+The proportion of participants below the recommended B vitamins intake levels for men were reported. Recommendations for men are used, rather than splitting the data by sex, because sex is not reported in the dataset and female dietary recommendations are less studied in scientific literature. Correlation between dietary intake, as well as caloric diet type, and B vitamin levels was assessed using scatter plots and linear fitted models.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Open necessary packages
+library(haven)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(gridExtra)
+library(tidyr)
+```
+
+## Exploring Variables of Interest
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results=FALSE}
+# Read in table and check
+data <- read_xpt("P_DR1TOT.XPT")
+head(data)
+tail(data)
+dim(data)
+sapply(data, class)
+```
+
+### Figure 1. Distribution of Macronutrients for All Participants
+
+```{r,  echo=FALSE, warning=FALSE}
+boxplot_data <- data |>
+  select(DR1TSUGR, DR1TCARB, DR1TTFAT, DR1TPROT) |>
+  pivot_longer(cols = everything(), names_to = "Nutrient", values_to = "Value")
+
+# Create the box plot
+ggplot(boxplot_data, aes(x = Nutrient, y = Value)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Box Plot of Macronutrient Intake for All Participants",
+       x = "Macronutrient",
+       y = "Nurtitional Intake (g)") +
+  scale_x_discrete(labels = c("DR1TCARB" = "Carbohydrates", "DR1TPROT" = "Protein","DR1TSUGR" = "Sugar", "DR1TTFAT" = "Fat")) +
+  theme_minimal()
+```
+
+All mean values for intake are increased by high outliers, so medians are assessed instead.
+
+### Table 1. Median Caloric, Macronutrient and B Vitamin Intake Levels
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Impute multiple columns at once
+data_avgs <- data |>
+  summarise(
+    Calories = median(DR1TKCAL, na.rm = TRUE),
+    Sugar = median(DR1TSUGR, na.rm = TRUE),
+    Carbohydrate = median(DR1TCARB, na.rm = TRUE),
+    Fat = median(DR1TTFAT, na.rm = TRUE),
+    Protein = median(DR1TPROT, na.rm = TRUE),
+    B1 = median(DR1TVB1, na.rm = TRUE),
+    B2 = median(DR1TVB2, na.rm = TRUE),
+    B6 = median(DR1TVB6, na.rm = TRUE))
+kable(data_avgs, caption = "Total Median Caloric (cal), Macronutrient (g) and B Vitamin Intake Levels (mg)")
+```
+
+These median values are used to categorize whether dietary intake is high (above the median) or low (below the median).
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results=FALSE}
+# Create categorical variables
+high_low <- data |>
+  mutate(
+    low_Calories = ifelse(DR1TKCAL < as.numeric(data_avgs['Calories']), 1, 0),
+    low_Sugar = ifelse(DR1TSUGR < as.numeric(data_avgs['Sugar']),1, 0),
+    low_Carbohydrate = ifelse(DR1TCARB < as.numeric(data_avgs['Carbohydrate']), 1, 0),
+    low_Fat = ifelse(DR1TTFAT < as.numeric(data_avgs['Fat']), 1, 0),
+    low_Protein = ifelse(DR1TPROT < as.numeric(data_avgs['Protein']), 1, 0)
+  ) |>
+  select(starts_with("low_") | starts_with("high_"))  # Keep only the categorical columns
+print(high_low)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results=FALSE}
+# Extract data to answer questions
+extracted_data <- data |>
+  select(DR1TKCAL, DRQSDT1, DRQSDT8, DR1TSUGR, DRQSDT4, DR1TCARB, DRQSDT9, DR1TTFAT, DRQSDT2, DR1TPROT, DRQSDT10, DR1TVB1, DR1TVB2, DR1TVB6) |>
+  rename(
+    Calories = DR1TKCAL,
+    Low_Calorie = DRQSDT1, # Low cal diet
+    High_Calorie = DRQSDT8, # Weight gain diet
+    Sugar = DR1TSUGR,
+    Low_Sugar = DRQSDT4, # Low sugar diet
+    Carbohydrate = DR1TCARB,
+    Low_Carbohydrate = DRQSDT9, # Low carb diet
+    Fat = DR1TTFAT,
+    Low_Fat = DRQSDT2, # Low fat diet
+    Protein = DR1TPROT,
+    High_Protein = DRQSDT10, # High Protein diet
+    # Vitamin Bs
+    B1 = DR1TVB1, # Vitamin B1
+    B2 = DR1TVB2, # Vitamin B2
+    B6 = DR1TVB6 # Vitamin B6
+  )
+
+# Edit dietary output
+extracted_data[c("Low_Calorie", "High_Calorie", "Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")] <- 
+  lapply(extracted_data[c("Low_Calorie", "High_Calorie", "Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")], function(x) {
+    x[is.na(x)] <- 0 # Replace NA values with 0
+    x[x != 0] <- 1 # Replace values other than 0 with 1
+    return(x)
+  })
+
+# Make a new variable for diet type
+extracted_data <- extracted_data |>
+  mutate(Calorie_diet = case_when(
+    Low_Calorie == 1 ~ 0,
+    High_Calorie == 1 ~ 1,
+    TRUE ~ 2  # Assign NA if neither condition is met
+  ))
+print(c("Head of Categorization of Diet Type (0 = Low Calorie, 1 = High Calorie and 2 = No Caloric Diet)"))
+head(extracted_data$Calorie_diet)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results=FALSE}
+# Summary of Extracted Data
+head(extracted_data)
+tail(extracted_data)
+dim(extracted_data)
+sapply(extracted_data, class)
+```
+
+# Preliminary Results
+
+## Investigate correlation between intended diet and dietary intake
+
+### Figure 2. Proportion of Participants with an Intended Macronutrient Diet Ingesting Above or Below the Total Median Intake
+
+```{r, echo=FALSE, warning=FALSE}
+# Check if both data frames have the same number of rows
+if (nrow(extracted_data) == nrow(high_low)) {
+  combined_data <- data.frame(
+    Low_Sugar = extracted_data$Low_Sugar,
+    low_Sugar = high_low$low_Sugar,
+    Low_Carbohydrate = extracted_data$Low_Carbohydrate,
+    low_Carbohydrate = high_low$low_Carbohydrate,
+    Low_Fat = extracted_data$Low_Fat,
+    low_Fat = high_low$low_Fat,
+    High_Protein = extracted_data$High_Protein,
+    low_Protein = high_low$low_Protein
+  )
+} else {
+  stop("The data frames have different numbers of rows and cannot be combined.")
+}
+
+# Create an empty list to store the plots
+plot_list <- list()
+
+# Create pairs for plotting
+pairs <- list(
+  c("Low_Sugar", "low_Sugar"), # Intended diet, actual intake
+  c("Low_Carbohydrate", "low_Carbohydrate"),
+  c("Low_Fat", "low_Fat"),
+  c("High_Protein", "low_Protein")
+)
+
+# Create a mapping for readable titles
+title_map <- c(
+  "Low_Sugar" = "Low Sugar",
+  "Low_Carbohydrate" = "Low Carbohydrate",
+  "Low_Fat" = "Low Fat",
+  "High_Protein" = "High Protein"
+)
+
+# Loop through pairs of variables to create stacked bar plots
+for (pair in pairs) {
+  
+  # Create a data frame for plotting (without reshaping)
+  plot_data <- data.frame(
+    Diet = factor(combined_data[[pair[1]]], levels = c(0, 1), labels = c("No", "Yes")),
+    Intake = factor(combined_data[[pair[2]]], levels = c(0, 1), labels = c("Above Median", "Below Median"))
+  )
+  
+  # Filter the data for Diet == "Yes" (Diet = 1)
+  plot_data <- plot_data[plot_data$Diet == "Yes", ]
+  
+  # Create a stacked bar plot
+  plot <- ggplot(plot_data, aes(x = Diet, fill = Intake)) +
+    geom_bar(position = "fill") +
+    scale_fill_manual(values = c("Above Median" = "salmon", "Below Median" = "skyblue")) +
+    labs(x = paste(title_map[1],"Diet"), 
+         y = "Proportion",
+         title = paste(title_map[pair[1]], "Diet vs. Intake")) +  # Use the mapped title) +
+    theme_minimal() +
+    theme(legend.title = element_blank())  # Remove legend title
+  
+  # Add the plot to the list
+  plot_list[[length(plot_list) + 1]] <- plot
+}
+
+# Arrange the plots in a 2x2 grid
+grid.arrange(grobs = plot_list, ncol = 2, nrow = 2)
+```
+
+Approximately 63% of participants on a low sugar diet are eating less than the median sugar levels, while nearly 75% of participants on a low carbohydrate diet are eating less than the median carbohydrate levels. Conversely, less than half of the participants are eating less than the median fat levels. Finally, more than 75% of participants are eating their intended high protein diet compared to the median protein levels.
+
+These results show that a high protein diet is the most well adhered to diet when compared to the surveyed participants, while a low fat diet is the least well adhered to diet.
+
+## Compare the spread of macronutrient intake levels of participants with an intended diet with those not on an intended diet
+
+```{r, echo=FALSE, warning=FALSE}
+# Function for summary statistics and plotting
+create_summary_plot <- function(data, cat_var, cont_var) {
+  # Convert the categorical variable to a factor
+  data[[cat_var]] <- as.factor(data[[cat_var]])
+  filtered_data <- data |> filter(is.finite(!!sym(cont_var)))
+  
+    # Create a mapping for human-readable titles
+  title_map <- c(
+    "Low_Sugar" = "Low Sugar",
+    "Low_Carbohydrate" = "Low Carbohydrate",
+    "Low_Fat" = "Low Fat",
+    "High_Protein" = "High Protein"
+  )
+
+  # Create the box plot with color based on the categorical variable
+  box_plot <- ggplot(filtered_data, aes_string(x = cat_var, y = cont_var, fill = cat_var)) +
+    geom_boxplot() +
+    labs(x = paste(title_map[cat_var], "(yes/no)"), y = cont_var) +  # Use mapped title for x-axis label
+    ggtitle(paste(cont_var, "Intake for", title_map[cat_var], "Diet Intention")) +  # Use mapped title for plot title
+    theme_minimal() +
+    scale_fill_manual(values = c("lightblue", "lightgreen")) +
+    theme(legend.position = "none")
+
+  # Create the summary table
+  summary_table <- data |>
+    group_by(!!sym(cat_var)) |>
+    summarize(
+      Mean = mean(!!sym(cont_var), na.rm = TRUE),
+      Median = median(!!sym(cont_var), na.rm = TRUE),
+      Min = min(!!sym(cont_var), na.rm = TRUE),
+      Max = max(!!sym(cont_var), na.rm = TRUE),
+      Count = n(),
+      .groups = 'drop'
+    )
+
+  # Return the plot and summary table separately
+  return(list(plot = box_plot, summary_table = summary_table))
+}
+
+# Create lists to hold the plots and individual summaries
+plots <- list()
+summaries <- list()
+
+# Generate box plots and individual summary tables for nutrients
+extracted_data$Low_Sugar <- factor(extracted_data$Low_Sugar, 
+                                            levels = c(0, 1), 
+                                            labels = c("No", "Yes"))
+result_sugar <- create_summary_plot(extracted_data, "Low_Sugar", "Sugar")
+plots[[1]] <- result_sugar$plot
+summaries[[1]] <- result_sugar$summary_table
+kable(result_sugar$summary_table, caption = "Table 1. Summary of Sugar Intake", , col.names = c("Low Diet", "Mean", "Median", "Min", "Max", "Count"))
+
+extracted_data$Low_Carbohydrate <- factor(extracted_data$Low_Carbohydrate, 
+                                            levels = c(0, 1), 
+                                            labels = c("No", "Yes"))
+result_carb <- create_summary_plot(extracted_data, "Low_Carbohydrate", "Carbohydrate")
+plots[[2]] <- result_carb$plot
+summaries[[2]] <- result_carb$summary_table
+kable(result_carb$summary_table, caption = "Table 2. Summary of Carbohydrate Intake", col.names = c("Low Carb Diet", "Mean", "Median", "Min", "Max", "Count"))
+
+extracted_data$Low_Fat <- factor(extracted_data$Low_Fat, 
+                                            levels = c(0, 1), 
+                                            labels = c("No", "Yes"))
+result_fat <- create_summary_plot(extracted_data, "Low_Fat", "Fat")
+plots[[3]] <- result_fat$plot
+summaries[[3]] <- result_fat$summary_table
+kable(result_fat$summary_table, caption = "Table 3. Summary of Fat Intake", col.names = c("Low Fat Diet", "Mean", "Median", "Min", "Max", "Count"))
+
+extracted_data$High_Protein <- factor(extracted_data$High_Protein, 
+                                            levels = c(0, 1), 
+                                            labels = c("No", "Yes"))
+result_pro <- create_summary_plot(extracted_data, "High_Protein", "Protein")
+plots[[4]] <- result_pro$plot
+summaries[[4]] <- result_pro$summary_table
+kable(result_pro$summary_table, caption = "Table 4. Summary of Protein Intake", col.names = c("High Protein Diet", "Mean", "Median", "Min", "Max", "Count"))
+
+```
+
+### Figure 3. Distribution of Macronutrient Dietary Intake by Diet Type
+
+```{r, echo=FALSE}
+# Print box plots
+grid.arrange(grobs = plots, ncol = 2) 
+```
+
+The low sugar group averaged lower total sugars than those not on the diet (62.24 vs 90.89 g). Additionally, the low carbohydrate group ate less carbohydrates than those not on this diet (165.395 vs 219.08 g). On the other hand, those on a low fat diet ate more fats than those not on the diet (72.62 vs 71.805 g), meaning the average participant on a low fat diet did not eat less fats than other participants. The average high protein diet had substantially more protein intake than those not on the diet (100.61 vs 64.72 g).
+
+### Table 5. Summary of Caloric Intake by Diet Type
+
+```{r, echo=FALSE, warning=FALSE}
+# Summary statistics for caloric diets
+diet_summary_stats <- extracted_data |>
+  mutate(Diet = recode(Calorie_diet,
+                               `0` = "Low Calorie Diet",
+                               `1` = "High Calorie Diet",
+                               `2` = "Neither")) |> 
+  # Group by the recoded Calorie_diet variable
+  group_by(Diet) |>
+  summarize(
+    Mean = mean(Calories, na.rm = TRUE),
+    Median = median(Calories, na.rm = TRUE),
+    Min = min(Calories, na.rm = TRUE),
+    Max = max(Calories, na.rm = TRUE),
+    Count = n(),
+    .groups = 'drop'
+  )
+kable(diet_summary_stats, caption = "Table 5. Summary of Caloric Intake")
+
+# Create the box plot for caloric diets
+plot <- ggplot(na.omit(extracted_data), aes(x = factor(Calorie_diet), y = Calories, fill = factor(Calorie_diet))) +
+  geom_boxplot(alpha = 0.7) +
+  labs(x = "Diet Type", y = "Calories", title = "Calories by Diet Type") +
+  scale_x_discrete(labels = c("0" = "Low Calorie Diet", "1" = "High Calorie Diet", "2" = "Neither")) +
+  scale_fill_manual(values = c("lightblue", "lightgreen", "salmon")) +
+  theme_minimal() +
+  theme(legend.title = element_blank())
+```
+
+### Figure 4. Distribution of Caloric Intake by Caloric Diet Type
+
+```{r, echo = FALSE}
+# Print the caloric diet box plot
+print(plot)
+```
+
+The average high calorie diet included substantially higher caloric intake than either the low calorie diet or those not on a caloric diet (2528 vs 1834 and 1821 cals), but the low calorie diet was actually slightly higher than those not on a caloric diet (1834 vs 1821 cals), meaning the average participant on a low calorie diet ate more calories than those not intending to calorically restrict.
+
+## Investigate correlations between dietary intake and B vitamins
+
+### Table 6. Proportion of Participants Below B Vitamin Recommended Intake for Men (Hanna et al., 2022)
+
+```{r, echo=FALSE}
+# Define recommended B vitamin values (Hanna et al.)
+recommended_values <- list(
+  B1 = 1.2,
+  B2 = 1.3,
+  B6 = 1
+)
+
+# Create a data frame to store proportions
+proportions <- data.frame(Vitamin = character(), Proportion_Below = numeric())
+
+# Loop through each vitamin variable
+for (vitamin in names(recommended_values)) {
+  if (vitamin %in% colnames(extracted_data)) {
+    # Calculate the number of people below the recommendation
+    below_recommendation <- sum(extracted_data[[vitamin]] < recommended_values[[vitamin]], na.rm = TRUE)
+    total_people <- sum(!is.na(extracted_data[[vitamin]]))  # Count of non-missing values
+    
+    # Calculate the proportion
+    proportion <- below_recommendation / total_people
+    
+    # Store the result
+    proportions <- rbind(proportions, data.frame(Vitamin = vitamin, Proportion_Below = proportion))
+  } else {
+    message(paste("Vitamin variable", vitamin, "not found in the data. Skipping."))
+  }
+}
+kable(proportions, col.names = c("B Vitamin", "Proportion of Participants Below Recommended Intake"))
+```
+
+These results show that while most participants are taking their recommended B vitamin levels, between 25% and 43% of participants are not with B1 having the highest proportion of participants below the recommended levels and B6 having the lowest proportion below the recommended proportion.
+
+### Figure 5. B Vitamin Levels vs Dietary Intake
+
+```{r, message=FALSE, warning=FALSE, echo=FALSE}
+create_scatter_plots <- function(data) {
+  # List of nutrient variables to plot
+  nutrient_vars <- c("Calories", "Carbohydrate", "Fat", "Protein")
+  
+  # List of vitamin variables to plot against
+  vitamin_vars <- c("B1", "B2", "B6")
+  
+  # Define recommended values for B vitamins
+  recommended_values <- list(
+    B1 = 1.2,
+    B2 = 1.3,
+    B6 = 1
+  )
+  
+  # Loop through each vitamin to create separate grids
+  for (vitamin in vitamin_vars) {
+    # Prepare an empty list to store the plot data for this vitamin
+    plot_data_list <- list()
+    
+    # Loop through each nutrient variable
+    for (nutrient in nutrient_vars) {
+      # Check if the nutrient exists in the data
+      if (!nutrient %in% colnames(data)) {
+        message(paste("Nutrient variable", nutrient, "not found in the data. Skipping."))
+        next
+      }
+      
+      # Check if vitamin exists in the data
+      if (vitamin %in% colnames(data)) {
+        # Prepare the data for modeling
+        temp_data <- data[, c(nutrient, vitamin)]
+        colnames(temp_data) <- c("Nutrient", "Vitamin")
+        
+        # Filter out missing and non-finite values
+        temp_data <- temp_data %>%
+          na.omit() %>%
+          filter(is.finite(Nutrient) & is.finite(Vitamin))
+        
+        # Check if there are enough data points for modeling
+        if (nrow(temp_data) > 1) {
+          # Fit a linear model and calculate R^2
+          model <- lm(Vitamin ~ Nutrient, data = temp_data)
+          r_squared <- summary(model)$r.squared
+          
+          # Add the necessary data for plotting, including the recommended values and R^2
+          plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
+            Nutrient = temp_data$Nutrient,
+            Vitamin = temp_data$Vitamin,
+            Vitamin_Name = vitamin,
+            Nutrient_Name = nutrient,
+            Recommended_Value = recommended_values[[vitamin]],
+            R_squared = r_squared
+          )
+        } else {
+          message(paste("Not enough data points for", vitamin, "vs", nutrient))
+        }
+      } else {
+        message(paste("Vitamin variable", vitamin, "not found in the data. Skipping."))
+      }
+    }
+    
+    # Combine all the data for this vitamin into a single data frame
+    plot_data <- bind_rows(plot_data_list)
+    
+    # Create the scatter plot for this vitamin using facet_wrap
+    scatter_plot <- ggplot(plot_data, aes(x = Nutrient, y = Vitamin)) +
+      geom_point(aes(color = Nutrient_Name), alpha = 0.7) +
+      geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Line of best fit
+      labs(x = "Dietary Intake", y = "B Vitamin Level") +
+      theme_minimal() +
+      facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +  # Free x-scale for each plot
+      theme(legend.title = element_blank(), strip.text = element_text(size = 12)) +
+      ggtitle(paste(vitamin, "Levels vs Dietary Intake")) +
+      # Add the recommended value horizontal lines for each vitamin
+      geom_hline(data = plot_data, aes(yintercept = Recommended_Value),
+                 linetype = "dashed", color = "red", linewidth = 0.7) +
+      # Annotate the R^2 value on each plot
+      geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))), 
+                hjust = 1.1, vjust = 1.1, color = "black", size = 4, 
+                fontface = "italic") +
+      # Adjust x-axis text for readability
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+    
+    # Print the scatter plot for this vitamin
+    print(scatter_plot)
+  }
+}
+
+# Call the function with your data
+create_scatter_plots(extracted_data)
+```
+
+Regressions were fit for each caloric diet type to answer the question of whether diet impact B vitamin intake. B1 and B2 vitamins are more strongly associated with all of the macronutrient intakes than B6, with the highest correlation occurring between B1 and caloric intake an B1 and carbohydrate intake. Overall, this demonstrates that getting enough dietary nutrition is critical for B1 and B2 vitamin daily replenishment.
+
+### Figure 6. Caloric Diet's Effect on B vitamins
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Load necessary library
+library(ggplot2)
+
+# Prepare the data for plotting
+plot_data <- extracted_data[, c("Calories", "B1", "B2", "B6", "Low_Calorie", "High_Calorie", "Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")]
+
+# Create a new column for DietType based on the diet indicators
+plot_data$DietType <- 2  # Default to 2 (No Diet)
+
+# Assign values for DietType based on conditions
+plot_data$DietType[plot_data$Low_Calorie == 1] <- 0
+plot_data$DietType[plot_data$High_Calorie == 1] <- 1
+
+# Convert DietType to a factor
+plot_data$DietType <- factor(plot_data$DietType, levels = c(0, 1, 2), labels = c("Low Diet", "High Diet", "No Diet"))
+
+# Filter out missing values
+plot_data <- na.omit(plot_data)
+
+# List of vitamins to plot against Calories
+vitamin_vars <- c("B1", "B2", "B6")
+
+# Create scatter plots for each vitamin
+for (vitamin in vitamin_vars) {
+  # Basic scatter plot with a linear model
+  scatter_plot <- ggplot(plot_data, aes_string(x = "Calories", y = vitamin, color = "DietType")) +
+    geom_point() +
+    geom_smooth(method = "lm", aes(group = DietType), se = FALSE) +  # Linear model for each diet type
+    labs(x = "Calories", y = paste("Vitamin", vitamin, "(mg)"), title = paste("Scatter Plot of Calories vs Vitamin", vitamin, "by Caloric Diet Type")) +
+    theme_minimal() +
+    scale_color_manual(values = c("red", "blue", "grey"))
+
+  # Color mapping for R² text
+  color_map <- c("Low Diet" = "red", "High Diet" = "blue", "No Diet" = "gray")
+  
+  # Initialize y_pos adjustments for each diet type
+  y_pos_adjustments <- list(
+    "Low Diet" = 0.45,  # Adjust this for Low Diet
+    "High Diet" = 0.375,  # Adjust this for High Diet
+    "No Diet" = 0.3    # Adjust this for No Diet
+  )
+  
+  # Create an empty list to store text annotations for each diet type
+  text_annotations <- list()
+  
+  # Calculate and display R² values
+  for (diet in levels(plot_data$DietType)) {
+    # Fit the model for each diet type
+    model <- lm(as.formula(paste(vitamin, "~ Calories")), data = plot_data[plot_data$DietType == diet, ])
+    r_squared <- summary(model)$r.squared
+    
+    # Calculate y position based on the maximum vitamin level and adjustment factor
+    max_y <- max(plot_data[[vitamin]], na.rm = TRUE)
+    y_pos <- max_y * y_pos_adjustments[[diet]]
+    
+    # Add the R² value to the text annotations list
+    text_annotations[[diet]] <- list(
+      x = max(plot_data$Calories, na.rm = TRUE) * 0.9,  # Place the text towards the right of the plot
+      y = y_pos,
+      label = paste("R² =", round(r_squared, 3)),
+      color = color_map[diet]
+    )
+    
+    # Adjust the y position for the next diet type to avoid overlap
+    y_pos_adjustments[[diet]] <- y_pos_adjustments[[diet]] - 0.05  # Slight downward shift for the next annotation
+  }
+  
+  # Add text annotations to the plot
+  for (annotation in text_annotations) {
+    scatter_plot <- scatter_plot +
+      annotate("text", x = annotation$x, y = annotation$y, 
+               label = annotation$label, color = annotation$color, 
+               hjust = 1, vjust = 1)
+  }
+  
+  # Print the scatter plot for this vitamin
+  print(scatter_plot)
+}
+```
+
+B vitamins have a mild-to-moderate association with dietary intake. The high calorie diet in the graphs of vitamins B1 and B2 vs calories have the highest slopes, indicating that an intention to eat more calories is also associated with an increase in B vitamin intake. This finding makes sense given participants on a high calorie diet actually eat more calories and caloric intake was shown to be moderately associated with these B vitamin levels. Interestingly, caloric diet type's association with the B vitamins was not consistent between the vitamins, indicating that more than just than dietary intention is necessary for sufficient B vitamin intake.
+
+# Conclusion
+
+Overall, the pre-pandemic (2017-March 2020) participants' intended diets is associated with their true intake. Specifically, participants on a low sugar and low carbohydrate diet ate less of these macronutrients than participants not on such a diet and participants with a high protein and high caloric diet ate more protein and overall calories, respectively, than participants without these dietary intentions. On the other hand, the average participant on a low fat and low calorie diet actually ate more fats or calories, respectively, than participants who did not report adhering to these diets. Thus, Americans 1 year or older are not eating their intended low fat and low calorie diets, when compared to the average diet, while all Americans eating all other assessed diets are follow their intended diets.
+
+One draw back to this analysis is that all interquartile ranges of dietary intake by intended diet overlap with those not following the diet. Therefore, truly following an intended diet is variable among Americans during this time period. This lack of conclusivity makes since considering dietary needs are relative to a person's physiological demands.
+
+43% of participants are below the recommended B1 levels guidelines for men, 35% are below the guidelines for B2 levels, and 26% are below the guidelines for B6 levels. Due to the correlations demonstrated between B vitamins and dietary intake, many participants should eat more macronutrients and overall calories to meet the body's B vitamin demands. In conclusion, the average American 1 year or older is eating their intended macronutrient diet and their intake is moderately associated with B vitamin levels during this time period.
