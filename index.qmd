@@ -20,6 +20,7 @@ library(gridExtra)
 library(tidyr)
 library(rsconnect)
 library(ggiraph)
+library(htmltools)
 
 # Load in data
 data <- read_xpt("P_DR1TOT.XPT")
@@ -193,6 +194,9 @@ create_interactive_scatter_plots <- function(data) {
     B6 = 1
   )
   
+  # List to store the interactive plots for each vitamin
+  interactive_plots <- list()
+  
   # Loop through each vitamin to create separate grids
   for (vitamin in vitamin_vars) {
     # Prepare an empty list to store the plot data for this vitamin
@@ -268,16 +272,24 @@ create_interactive_scatter_plots <- function(data) {
       # Adjust x-axis text for readability
       theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
     
-    # Print the interactive scatter plot for this vitamin using girafe()
+    # Create the interactive plot using girafe
     interactive_plot <- girafe(ggobj = scatter_plot)
     
-    # Explicitly print the plot
-    print(interactive_plot)
+    # Store the interactive plot in the list
+    interactive_plots[[vitamin]] <- girafeOutput(interactive_plot)
   }
+  
+  # Return the list of interactive plots
+  return(interactive_plots)
 }
 
-# Call the function with your data (ensure `extracted_data` is a valid dataframe)
-create_interactive_scatter_plots(extracted_data)
+# Example of using the function for your data
+interactive_plots <- create_interactive_scatter_plots(extracted_data)
+
+# Display each plot (B1, B2, and B6)
+for (plot in interactive_plots) {
+  print(plot)
+}
 ```
 
 ## Association between caloric diet and B vitamin levels
@@ -288,6 +300,7 @@ Overall, B vitamins have a mild-to-moderate association with dietary intake. The
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 create_interactive_vitamin_plots <- function(data) {
+  
   # Prepare plot data from the dataset
   plot_data <- data[, c("Calories", "B1", "B2", "B6", "Low_Calorie", "High_Calorie", "Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")]
   
@@ -309,6 +322,9 @@ create_interactive_vitamin_plots <- function(data) {
   
   # Color mapping for Diet Types
   color_map <- c("Low Diet" = "red", "High Diet" = "blue", "No Diet" = "grey")
+  
+  # List to store all interactive plots
+  interactive_plots <- list()
   
   # Create scatter plots for each vitamin
   for (vitamin in vitamin_vars) {
@@ -361,14 +377,19 @@ create_interactive_vitamin_plots <- function(data) {
                  hjust = 1, vjust = 1)
     }
     
-    # Create the interactive plot using girafe
-    interactive_plot <- girafe(ggobj = scatter_plot)
-    
-    # Explicitly print the interactive plot
-    print(interactive_plot)
+    # Create the interactive plot using girafe and store in the list
+    interactive_plots[[vitamin]] <- girafe(ggobj = scatter_plot)
   }
+  
+  # Return all the interactive plots
+  return(interactive_plots)
 }
 
-# Call the function with your data (ensure `extracted_data` is a valid dataframe)
-create_interactive_vitamin_plots(extracted_data)
+# Example of using the function for your data
+interactive_plots <- create_interactive_vitamin_plots(extracted_data)
+
+# Display each plot (B1, B2, and B6)
+for (plot in interactive_plots) {
+  print(plot)
+}
 ```
