@@ -247,7 +247,8 @@ for (vitamin in vitamin_vars) {
                linetype = "dashed", color = "red", linewidth = 0.7) +
     geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))),
               hjust = 1.1, vjust = 1.1, color = "black", size = 4, fontface = "italic") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) +
+    theme(legend.position = "none")  # Remove legend
 
   # Convert ggplot to plotly interactive plot
   interactive_plots[[vitamin]] <- ggplotly(scatter_plot)
@@ -295,7 +296,8 @@ for (vitamin in vitamin_vars) {
     geom_smooth(method = "lm", aes(group = DietType), se = FALSE) +  # Linear model for each diet type
     labs(x = "Calories", y = paste("Vitamin", vitamin, "(mg)"), title = paste("Scatter Plot of Calories vs Vitamin", vitamin, "by Caloric Diet Type")) +
     theme_minimal() +
-    scale_color_manual(values = c("red", "blue", "grey"))
+    scale_color_manual(values = c("red", "blue", "grey")) +
+    theme(legend.position = "none")  # Remove legend
   
   # Color mapping for R² text
   color_map <- c("Low Diet" = "red", "High Diet" = "blue", "No Diet" = "gray")
