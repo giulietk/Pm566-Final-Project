@@ -21,7 +21,6 @@ library(tidyr)
 library(rsconnect)
 library(ggiraph)
 library(htmltools)
-library(htmlwidgets)
 
 # Load in data
 data <- read_xpt("P_DR1TOT.XPT")
@@ -152,7 +151,7 @@ plots$High_Protein_Protein
 
 ## Distribution of caloric intake
 
-The median high calorie diet included substantially higher caloric intake than either the low calorie diet or those not on a caloric diet (2528 vs 1834 and 1821 cals, respectively), meaning participants intending to eat high amounts of calories are following their dietary plan. On the other hand, the low calorie diet had a slightly higher median than those not on a caloric diet (1834 vs 1821 cals), meaning the average participant on a low calorie diet actually ate more calories than those not intending to calorically restrict and were not following their intended diet.
+The median high calorie diet included substantially higher caloric intake than either the low calorie diet or those not on a caloric diet (2528 vs 1834 and 1821 cals, respectively), meaning participants intending to eat high amonts of calories are following their dietary plan. On the other hand, the low calorie diet had a slightly higher median than those not on a caloric diet (1834 vs 1821 cals), meaning the average participant on a low calorie diet actually ate more calories than those not intending to calorically restrict and were not following their intended diet.
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # Recreating figure 4
@@ -178,58 +177,38 @@ interactive_plot
 
 Linear regressions are fit for each caloric diet type to answer the question of whether diet impact B vitamin intake. B1 and B2 vitamins are more strongly associated (highest correlation value of 0.32 to 0.48 and 0.31 to 0.42, respectively) with all of the macronutrient intakes than B6 (correlation of 0.14 to 0.28), with the highest correlation occurring between B1 and caloric intake (0.48) an B1 and carbohydrate intake (0.45). Overall, this demonstrates that getting enough dietary nutrition is critical for B1 and B2 vitamin daily replenishment.
 
-Red dashed lines are used to represent the recommended B vitamins intake levels for men of 1.2 mg of B1, 1.3 milligrams (mg) of B2 and 1 mg of B6.
+Red dashed lines are used to represent the recommended B vitamins intake levels for men of 1.2 mg of B1, 1.3 miligrams (mg) of B2 and 1 mg of B6.
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# Recreate figure 5 using this function
-create_interactive_scatter_plots <- function(data) {
-  # List of nutrient variables to plot
+# Recreate figure 5
+create_scatter_plots <- function(data) {
   nutrient_vars <- c("Calories", "Carbohydrate", "Fat", "Protein")
-  
-  # List of vitamin variables to plot against
   vitamin_vars <- c("B1", "B2", "B6")
+  recommended_values <- list(B1 = 1.2, B2 = 1.3, B6 = 1)
   
-  # Define recommended values for B vitamins
-  recommended_values <- list(
-    B1 = 1.2,
-    B2 = 1.3,
-    B6 = 1
-  )
+  plot_list <- list()  # To store multiple plots
   
-  # List to store interactive plots
-  interactive_plots <- list()
-  
-  # Loop through each vitamin to create separate plots
+  # Loop through each vitamin to create separate grids
   for (vitamin in vitamin_vars) {
-    # Prepare an empty list to store the plot data for this vitamin
     plot_data_list <- list()
     
-    # Loop through each nutrient variable
     for (nutrient in nutrient_vars) {
-      # Check if the nutrient exists in the data
       if (!nutrient %in% colnames(data)) {
-        message(paste("Nutrient variable", nutrient, "not found in the data. Skipping."))
         next
       }
       
-      # Check if vitamin exists in the data
       if (vitamin %in% colnames(data)) {
-        # Prepare the data for modeling
         temp_data <- data[, c(nutrient, vitamin)]
         colnames(temp_data) <- c("Nutrient", "Vitamin")
         
-        # Filter out missing and non-finite values, but retain some data for the plot
         temp_data <- temp_data %>%
-          filter(!is.na(Nutrient) & !is.na(Vitamin)) %>%
+          na.omit() %>%
           filter(is.finite(Nutrient) & is.finite(Vitamin))
         
-        # Check if there are enough data points for modeling
         if (nrow(temp_data) > 1) {
-          # Fit a linear model and calculate R^2
           model <- lm(Vitamin ~ Nutrient, data = temp_data)
           r_squared <- summary(model)$r.squared
           
-          # Add the necessary data for plotting, including the recommended values and R^2
           plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
             Nutrient = temp_data$Nutrient,
             Vitamin = temp_data$Vitamin,
@@ -238,64 +217,63 @@ create_interactive_scatter_plots <- function(data) {
             Recommended_Value = recommended_values[[vitamin]],
             R_squared = r_squared
           )
-        } else {
-          message(paste("Not enough data points for", vitamin, "vs", nutrient))
         }
-      } else {
-        message(paste("Vitamin variable", vitamin, "not found in the data. Skipping."))
       }
     }
     
-    # Combine all the data for this vitamin into a single data frame
     plot_data <- bind_rows(plot_data_list)
     
-    # Check if plot_data is empty
-    if (nrow(plot_data) == 0) {
-      message(paste("No data available for vitamin", vitamin, "after filtering. Skipping this vitamin."))
-      next  # Skip to the next vitamin
-    }
-    
-    # Create the scatter plot for this vitamin using facet_wrap
     scatter_plot <- ggplot(plot_data, aes(x = Nutrient, y = Vitamin)) +
-      geom_point_interactive(aes(color = Nutrient_Name, tooltip = paste("Nutrient:", Nutrient, "\nVitamin:", Vitamin))) + 
-      geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Line of best fit
+      geom_point(aes(color = Nutrient_Name), alpha = 0.7) +
+      geom_smooth(method = "lm", se = FALSE, color = "blue") +
       labs(x = "Dietary Intake", y = "B Vitamin Level") +
       theme_minimal() +
-      facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +  # Free x-scale for each plot
+      facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +
       theme(legend.title = element_blank(), strip.text = element_text(size = 12)) +
       ggtitle(paste(vitamin, "Levels vs Dietary Intake")) +
-      # Add the recommended value horizontal lines for each vitamin
       geom_hline(data = plot_data, aes(yintercept = Recommended_Value),
                  linetype = "dashed", color = "red", linewidth = 0.7) +
-      # Annotate the R^2 value on each plot
-      geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))), 
-                hjust = 1.1, vjust = 1.1, color = "black", size = 4, 
-                fontface = "italic") +
-      # Adjust x-axis text for readability
+      geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))),
+                hjust = 1.1, vjust = 1.1, color = "black", size = 4, fontface = "italic") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
     
-    # Create the interactive plot using girafe
-    interactive_plot <- girafe(ggobj = scatter_plot)
-    
-    # Save each interactive plot as an HTML file (e.g., one per vitamin)
-    output_file <- paste0("interactive_plot_", vitamin, ".html")
-    saveWidget(interactive_plot, output_file)  # Save the interactive plot
-    
-    # Store the plot file paths for later use
-    interactive_plots[[vitamin]] <- output_file
+    interactive_plot <- ggplotly(scatter_plot)
+    plot_list[[vitamin]] <- interactive_plot
   }
   
-  # Return the list of interactive plot file paths
-  return(interactive_plots)
+  return(plot_list)
 }
-```
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# Run the function
-interactive_plots <- create_interactive_scatter_plots(extracted_data)
+# Shiny UI
+ui <- fluidPage(
+  titlePanel("Interactive Nutrient vs Vitamin Levels"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("vitamin", "Select Vitamin", choices = c("B1", "B2", "B6")),
+      width = 3
+    ),
+    mainPanel(
+      plotlyOutput("scatter_plot"),  # Placeholder for interactive plot
+      width = 9
+    )
+  )
+)
 
-# Display each plot (B1, B2, and B6) by printing them one after another
-interactive_plots
+# Shiny Server
+server <- function(input, output) {
+  
+  # Generate interactive plots based on selected vitamin
+  plot_data <- create_scatter_plots(extracted_data)
+  
+  # Render the selected vitamin's plot
+  output$scatter_plot <- renderPlotly({
+    selected_vitamin <- input$vitamin
+    plot_data[[selected_vitamin]]
+  })
+}
+
+# Run the Shiny app
+shinyApp(ui = ui, server = server)
 ```
 
 ## Association between caloric diet and B vitamin levels
