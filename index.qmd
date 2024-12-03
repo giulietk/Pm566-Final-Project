@@ -181,52 +181,82 @@ Linear regressions are fit for each caloric diet type to answer the question of 
 Red dashed lines are used to represent the recommended B vitamins intake levels for men of 1.2 mg of B1, 1.3 miligrams (mg) of B2 and 1 mg of B6.
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# Recreate figure 5
-create_scatter_plots_data <- function(data) {
-  nutrient_vars <- c("Calories", "Carbohydrate", "Fat", "Protein")
-  vitamin_vars <- c("B1", "B2", "B6")
+nutrient_vars <- c("Calories", "Carbohydrate", "Fat", "Protein")
+
+# List of vitamin variables to plot against
+vitamin_vars <- c("B1", "B2", "B6")
+
+# Define recommended values for B vitamins
+recommended_values <- list(
+  B1 = 1.2,
+  B2 = 1.3,
+  B6 = 1
+)
+
+# Initialize an empty list to store the interactive plots
+interactive_plots <- list()
+
+# Create interactive plots for each vitamin
+for (vitamin in vitamin_vars) {
+  plot_data_list <- list()  # List to store individual plot data
   
-  recommended_values <- list(
-    B1 = 1.2,
-    B2 = 1.3,
-    B6 = 1
-  )
-  
-  plot_data_list <- list()
-  
-  for (vitamin in vitamin_vars) {
-    for (nutrient in nutrient_vars) {
-      if (!nutrient %in% colnames(data)) next
-      if (vitamin %in% colnames(data)) {
-        temp_data <- data[, c(nutrient, vitamin)]
-        colnames(temp_data) <- c("Nutrient", "Vitamin")
+  # Loop through each nutrient variable to generate data and plot for the current vitamin
+  for (nutrient in nutrient_vars) {
+    if (nutrient %in% colnames(extracted_data) && vitamin %in% colnames(extracted_data)) {
+      
+      # Prepare the data for modeling
+      temp_data <- extracted_data[, c(nutrient, vitamin)]
+      colnames(temp_data) <- c("Nutrient", "Vitamin")
+      
+      # Filter out missing and non-finite values
+      temp_data <- temp_data %>%
+        na.omit() %>%
+        filter(is.finite(Nutrient) & is.finite(Vitamin))
+      
+      # Fit a linear model and calculate R^2
+      if (nrow(temp_data) > 1) {
+        model <- lm(Vitamin ~ Nutrient, data = temp_data)
+        r_squared <- summary(model)$r.squared
         
-        temp_data <- temp_data %>%
-          na.omit() %>%
-          filter(is.finite(Nutrient) & is.finite(Vitamin))
-        
-        if (nrow(temp_data) > 1) {
-          model <- lm(Vitamin ~ Nutrient, data = temp_data)
-          r_squared <- summary(model)$r.squared
-          
-          plot_data_list[[length(plot_data_list) + 1]] <- list(
-            nutrient = nutrient,
-            vitamin = vitamin,
-            data = temp_data,
-            recommended_value = recommended_values[[vitamin]],
-            r_squared = r_squared
-          )
-        }
+        # Create plot data for this nutrient vs. vitamin
+        plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
+          Nutrient = temp_data$Nutrient,
+          Vitamin = temp_data$Vitamin,
+          Vitamin_Name = vitamin,
+          Nutrient_Name = nutrient,
+          Recommended_Value = recommended_values[[vitamin]],
+          R_squared = r_squared
+        )
       }
     }
   }
   
-  # Save the data as JSON to use in JavaScript
-  jsonlite::write_json(plot_data_list, "scatter_plot_data.json")
+  # Combine all the data for this vitamin into a single data frame
+  plot_data <- bind_rows(plot_data_list)
+  
+  # Create the ggplot for this vitamin
+  scatter_plot <- ggplot(plot_data, aes(x = Nutrient, y = Vitamin)) +
+    geom_point(aes(color = Nutrient_Name)) +
+    geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Line of best fit
+    labs(x = "Dietary Intake", y = "B Vitamin Level") +
+    theme_minimal() +
+    facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +  # Free x-scale for each plot
+    theme(legend.title = element_blank(), strip.text = element_text(size = 12)) +
+    ggtitle(paste(vitamin, "Levels vs Dietary Intake")) +
+    geom_hline(data = plot_data, aes(yintercept = Recommended_Value),
+               linetype = "dashed", color = "red", linewidth = 0.7) +
+    geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))),
+              hjust = 1.1, vjust = 1.1, color = "black", size = 4, fontface = "italic") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+
+  # Convert ggplot to plotly interactive plot
+  interactive_plots[[vitamin]] <- ggplotly(scatter_plot)
 }
 
-# Call function to create the data and save to JSON
-create_scatter_plots_data(extracted_data)
+# To view the interactive plot for each vitamin, simply call:
+interactive_plots$B1
+interactive_plots$B2
+interactive_plots$B6
 ```
 
 ## Association between caloric diet and B vitamin levels
@@ -236,97 +266,92 @@ Given that dietary nutrition correlated with B vitamin levels, it is useful to k
 Overall, B vitamins have a mild-to-moderate association with dietary intake. The high calorie diet in the graphs of vitamins B1 and B2 vs calories have the highest slopes, indicating that an intention to eat more calories is also associated with an increase in B vitamin intake. This finding makes sense given participants on a high calorie diet actually eat more calories and caloric intake was shown to be moderately associated with these B vitamin levels. Interestingly, caloric diet type's association with the B vitamins was not consistent between the vitamins, indicating that more than just than dietary intention is necessary for sufficient B vitamin intake.
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-create_interactive_vitamin_plots <- function(data) {
+# Prepare the plot data as per the provided code
+plot_data <- extracted_data[, c("Calories", "B1", "B2", "B6", "Low_Calorie", "High_Calorie", "Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")]
+
+# Create a new column for DietType based on the diet indicators
+plot_data$DietType <- 2  # Default to 2 (No Diet)
+
+# Assign values for DietType based on conditions
+plot_data$DietType[plot_data$Low_Calorie == 1] <- 0
+plot_data$DietType[plot_data$High_Calorie == 1] <- 1
+
+# Convert DietType to a factor
+plot_data$DietType <- factor(plot_data$DietType, levels = c(0, 1, 2), labels = c("Low Diet", "High Diet", "No Diet"))
+
+# Filter out missing values
+plot_data <- na.omit(plot_data)
+
+# List of vitamins to plot against Calories
+vitamin_vars <- c("B1", "B2", "B6")
+
+# Create interactive scatter plots for each vitamin
+interactive_plots <- list()  # List to store the interactive plots
+
+for (vitamin in vitamin_vars) {
+  # Basic scatter plot with a linear model
+  scatter_plot <- ggplot(plot_data, aes_string(x = "Calories", y = vitamin, color = "DietType")) +
+    geom_point(aes(text = paste("Calories:", Calories, "<br>Vitamin:", vitamin, "<br>Diet:", DietType))) +  # Interactive points with text
+    geom_smooth(method = "lm", aes(group = DietType), se = FALSE) +  # Linear model for each diet type
+    labs(x = "Calories", y = paste("Vitamin", vitamin, "(mg)"), title = paste("Scatter Plot of Calories vs Vitamin", vitamin, "by Caloric Diet Type")) +
+    theme_minimal() +
+    scale_color_manual(values = c("red", "blue", "grey"))
   
-  # Prepare plot data from the dataset
-  plot_data <- data[, c("Calories", "B1", "B2", "B6", "Low_Calorie", "High_Calorie", "Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")]
+  # Color mapping for R² text
+  color_map <- c("Low Diet" = "red", "High Diet" = "blue", "No Diet" = "gray")
   
-  # Create a new column for DietType based on the diet indicators
-  plot_data$DietType <- 2  # Default to 2 (No Diet)
+  # Initialize y_pos adjustments for each diet type
+  y_pos_adjustments <- list(
+    "Low Diet" = 0.45,  # Adjust this for Low Diet
+    "High Diet" = 0.375,  # Adjust this for High Diet
+    "No Diet" = 0.3    # Adjust this for No Diet
+  )
   
-  # Assign values for DietType based on conditions
-  plot_data$DietType[plot_data$Low_Calorie == 1] <- 0
-  plot_data$DietType[plot_data$High_Calorie == 1] <- 1
+  # Create an empty list to store text annotations for each diet type
+  text_annotations <- list()
   
-  # Convert DietType to a factor
-  plot_data$DietType <- factor(plot_data$DietType, levels = c(0, 1, 2), labels = c("Low Diet", "High Diet", "No Diet"))
-  
-  # Filter out missing values
-  plot_data <- na.omit(plot_data)
-  
-  # List of vitamins to plot against Calories
-  vitamin_vars <- c("B1", "B2", "B6")
-  
-  # Color mapping for Diet Types
-  color_map <- c("Low Diet" = "red", "High Diet" = "blue", "No Diet" = "grey")
-  
-  # List to store all interactive plots
-  interactive_plots <- list()
-  
-  # Create scatter plots for each vitamin
-  for (vitamin in vitamin_vars) {
-    # Initialize the plot with ggplot2
-    scatter_plot <- ggplot(plot_data, aes_string(x = "Calories", y = vitamin, color = "DietType")) +
-      geom_point_interactive(aes(tooltip = paste("Calories:", Calories, "\nVitamin:", vitamin, "\nDiet Type:", DietType))) +  # Tooltip for interactivity
-      geom_smooth(method = "lm", aes(group = DietType), se = FALSE) +  # Linear model for each diet type
-      labs(x = "Calories", y = paste("Vitamin", vitamin, "(mg)"), title = paste("Scatter Plot of Calories vs Vitamin", vitamin, "by Caloric Diet Type")) +
-      theme_minimal() +
-      scale_color_manual(values = color_map) +
-      theme(legend.title = element_blank())
+  # Calculate and display R² values
+  for (diet in levels(plot_data$DietType)) {
+    # Fit the model for each diet type
+    model <- lm(as.formula(paste(vitamin, "~ Calories")), data = plot_data[plot_data$DietType == diet, ])
+    r_squared <- summary(model)$r.squared
     
-    # Initialize y_pos adjustments for each diet type
-    y_pos_adjustments <- list(
-      "Low Diet" = 0.45,  # Adjust this for Low Diet
-      "High Diet" = 0.375,  # Adjust this for High Diet
-      "No Diet" = 0.3    # Adjust this for No Diet
+    # Calculate y position based on the maximum vitamin level and adjustment factor
+    max_y <- max(plot_data[[vitamin]], na.rm = TRUE)
+    y_pos <- max_y * y_pos_adjustments[[diet]]
+    
+    # Add the R² value to the text annotations list
+    text_annotations[[diet]] <- list(
+      x = max(plot_data$Calories, na.rm = TRUE) * 0.9,  # Place the text towards the right of the plot
+      y = y_pos,
+      label = paste("R² =", round(r_squared, 3)),
+      color = color_map[diet]
     )
     
-    # Create an empty list to store text annotations for each diet type
-    text_annotations <- list()
-    
-    # Calculate and display R² values
-    for (diet in levels(plot_data$DietType)) {
-      # Fit the model for each diet type
-      model <- lm(as.formula(paste(vitamin, "~ Calories")), data = plot_data[plot_data$DietType == diet, ])
-      r_squared <- summary(model)$r.squared
-      
-      # Calculate y position based on the maximum vitamin level and adjustment factor
-      max_y <- max(plot_data[[vitamin]], na.rm = TRUE)
-      y_pos <- max_y * y_pos_adjustments[[diet]]
-      
-      # Add the R² value to the text annotations list
-      text_annotations[[diet]] <- list(
-        x = max(plot_data$Calories, na.rm = TRUE) * 0.9,  # Place the text towards the right of the plot
-        y = y_pos,
-        label = paste("R² =", round(r_squared, 3)),
-        color = color_map[diet]
-      )
-      
-      # Adjust the y position for the next diet type to avoid overlap
-      y_pos_adjustments[[diet]] <- y_pos_adjustments[[diet]] - 0.05  # Slight downward shift for the next annotation
-    }
-    
-    # Add text annotations to the plot
-    for (annotation in text_annotations) {
-      scatter_plot <- scatter_plot +
-        annotate("text", x = annotation$x, y = annotation$y, 
-                 label = annotation$label, color = annotation$color, 
-                 hjust = 1, vjust = 1)
-    }
-    
-    # Create the interactive plot using girafe and store in the list
-    interactive_plots[[vitamin]] <- girafe(ggobj = scatter_plot)
+    # Adjust the y position for the next diet type to avoid overlap
+    y_pos_adjustments[[diet]] <- y_pos_adjustments[[diet]] - 0.05  # Slight downward shift for the next annotation
   }
   
-  # Return all the interactive plots
-  return(interactive_plots)
+  # Add text annotations to the plot
+  for (annotation in text_annotations) {
+    scatter_plot <- scatter_plot +
+      annotate("text", x = annotation$x, y = annotation$y, 
+               label = annotation$label, color = annotation$color, 
+               hjust = 1, vjust = 1)
+  }
+  
+  # Convert ggplot to plotly interactive plot
+  interactive_plot <- ggplotly(scatter_plot, tooltip = "text")  # Use 'text' for hover information
+  
+  # Store the interactive plot in the list
+  interactive_plots[[vitamin]] <- interactive_plot
+  
+  # Print the interactive plot for this vitamin
+  print(interactive_plot)
 }
 
-# Example of using the function for your data
-interactive_plots <- create_interactive_vitamin_plots(extracted_data)
-
-# Display each plot (B1, B2, and B6)
-for (plot in interactive_plots) {
-  print(plot)
-}
+# To view the interactive plot for each vitamin, simply call:
+interactive_plots$B1
+interactive_plots$B2
+interactive_plots$B6
 ```
