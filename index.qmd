@@ -152,7 +152,7 @@ plots$High_Protein_Protein
 
 ## Distribution of caloric intake
 
-The median high calorie diet included substantially higher caloric intake than either the low calorie diet or those not on a caloric diet (2528 vs 1834 and 1821 cals, respectively), meaning participants intending to eat high amonts of calories are following their dietary plan. On the other hand, the low calorie diet had a slightly higher median than those not on a caloric diet (1834 vs 1821 cals), meaning the average participant on a low calorie diet actually ate more calories than those not intending to calorically restrict and were not following their intended diet.
+The median high calorie diet included substantially higher caloric intake than either the low calorie diet or those not on a caloric diet (2528 vs 1834 and 1821 cals, respectively), meaning participants intending to eat high amounts of calories are following their dietary plan. On the other hand, the low calorie diet had a slightly higher median than those not on a caloric diet (1834 vs 1821 cals), meaning the average participant on a low calorie diet actually ate more calories than those not intending to calorically restrict and were not following their intended diet.
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # Recreating figure 4
@@ -238,7 +238,7 @@ for (vitamin in vitamin_vars) {
   scatter_plot <- ggplot(plot_data, aes(x = Nutrient, y = Vitamin)) +
     geom_point(aes(color = Nutrient_Name)) +
     geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Line of best fit
-    labs(x = "Dietary Intake", y = "B Vitamin Level") +
+    labs(x = "Dietary Intake", y = paste("Vitamin", vitamin, "Level (mg)")) +
     theme_minimal() +
     facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +  # Free x-scale for each plot
     theme(legend.title = element_blank(), strip.text = element_text(size = 12)) +

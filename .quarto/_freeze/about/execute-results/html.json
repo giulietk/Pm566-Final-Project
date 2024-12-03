@@ -1,0 +1,17 @@
+{
+  "hash": "a13a547d9cf8046e52f03cd247068c5f",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Download Full Report\"\n---\n\n::: {.cell}\n\n```{.r .cell-code}\nlibrary(shiny)\n```\n:::\n\n\n\n\nDownload html here: https://github.com/giulietk/Pm566-Final-Project/blob/54c6cbd8c01492b67c13afbd01899fd9771ea0e0/docs/Final%20Project.html\n\n\n\n::: {.cell}\n\n```{.r .cell-code}\nui <- fluidPage(\n  tags$a(href = \"https://github.com/giulietk/Pm566-Final-Project/blob/54c6cbd8c01492b67c13afbd01899fd9771ea0e0/docs/Final%20Project.html\", \n         \"Download html here\")\n)\n\nserver <- function(input, output) {\n  # Server logic\n}\n\nshinyApp(ui = ui, server = server)\n```\n\n::: {.cell-output .cell-output-stderr}\n\n```\n\nListening on http://127.0.0.1:8105\n```\n\n\n:::\n\n::: {.cell-output-display}\n![](about_files/figure-html/unnamed-chunk-2-1.png){width=672}\n:::\n:::\n",
+    "supporting": [
+      "about_files"
+    ],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}
