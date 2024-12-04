@@ -576,7 +576,7 @@ for (vitamin in vitamin_vars) {
 }
 ```
 
-B vitamins have a mild-to-moderate association with dietary intake. The high calorie diet in the graphs of vitamins B1 and B2 vs calories have the highest slopes, indicating that an intention to eat more calories is also associated with an increase in B vitamin intake. This finding makes sense given participants on a high calorie diet actually eat more calories and caloric intake was shown to be moderately associated with these B vitamin levels. Interestingly, caloric diet type's association with the B vitamins was not consistent between the vitamins, indicating that more just than dietary intention is necessary for sufficient B vitamin intake.
+B vitamins have a mild-to-moderate association with caloric intake for each caloric diet group. The high calorie diet in the graphs of vitamins B1 and B2 vs calories have the highest slopes, indicating that an intention to eat more calories is also associated with an increase in B vitamin intake. This finding makes sense given participants on a high calorie diet actually eat more calories and caloric intake was shown to be moderately associated with these B vitamin levels. Interestingly, caloric diet type's association with the B vitamins was not consistent between the vitamins, indicating that more just than dietary intention is necessary for sufficient B vitamin intake.
 
 # Conclusion
 

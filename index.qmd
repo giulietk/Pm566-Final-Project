@@ -264,7 +264,7 @@ interactive_plots$B6
 
 ## Association between caloric diet and B vitamin levels
 
-Given that dietary nutrition correlated with B vitamin levels, it is useful to know if the intention of dietary consumption is also correlated with B vitamin levels.
+Given that caloric intake is correlated with B vitamin levels, it is useful to know if caloric intake is also associated with B vitamin levels each caloric diet group.
 
 Overall, B vitamins have a mild-to-moderate association with dietary intake. The high calorie diet in the graphs of vitamins B1 and B2 vs calories have the highest slopes, indicating that an intention to eat more calories is also associated with an increase in B vitamin intake. This finding makes sense given participants on a high calorie diet actually eat more calories and caloric intake was shown to be moderately associated with these B vitamin levels. Interestingly, caloric diet type's association with the B vitamins was not consistent between the vitamins, indicating that more than just dietary intention is necessary for sufficient B vitamin intake.
 
