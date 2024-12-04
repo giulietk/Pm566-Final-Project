@@ -269,7 +269,6 @@ Given that dietary nutrition correlated with B vitamin levels, it is useful to k
 Overall, B vitamins have a mild-to-moderate association with dietary intake. The high calorie diet in the graphs of vitamins B1 and B2 vs calories have the highest slopes, indicating that an intention to eat more calories is also associated with an increase in B vitamin intake. This finding makes sense given participants on a high calorie diet actually eat more calories and caloric intake was shown to be moderately associated with these B vitamin levels. Interestingly, caloric diet type's association with the B vitamins was not consistent between the vitamins, indicating that more than just than dietary intention is necessary for sufficient B vitamin intake.
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-# Prepare the plot data as per the provided code
 plot_data <- extracted_data[, c("Calories", "B1", "B2", "B6", "Low_Calorie", "High_Calorie", "Low_Sugar", "Low_Carbohydrate", "Low_Fat", "High_Protein")]
 
 # Create a new column for DietType based on the diet indicators
@@ -288,21 +287,20 @@ plot_data <- na.omit(plot_data)
 # List of vitamins to plot against Calories
 vitamin_vars <- c("B1", "B2", "B6")
 
-# Create interactive scatter plots for each vitamin
-interactive_plots <- list()  # List to store the interactive plots
-
+# Create scatter plots for each vitamin
 for (vitamin in vitamin_vars) {
   # Basic scatter plot with a linear model
   scatter_plot <- ggplot(plot_data, aes_string(x = "Calories", y = vitamin, color = "DietType")) +
-    geom_point(aes(text = paste("Calories:", Calories, "<br>Vitamin:", vitamin, "<br>Diet:", DietType))) +  # Interactive points with text
+    geom_point(alpha = 0.3) +  
     geom_smooth(method = "lm", aes(group = DietType), se = FALSE) +  # Linear model for each diet type
     labs(x = "Calories", y = paste("Vitamin", vitamin, "(mg)"), title = paste("Scatter Plot of Calories vs Vitamin", vitamin, "by Caloric Diet Type")) +
     theme_minimal() +
-    scale_color_manual(values = c("red", "blue", "grey")) +
-    theme(
-    legend.position = "none",  # Remove the legend
-    legend.title = element_blank())  # Remove legend title, if present
-  
+    scale_color_manual(
+      values = c("Low Diet" = "red", "High Diet" = "blue", "No Diet" = "grey"),
+      name = "Diet Type",  # Title for the legend
+      labels = c("Low Calorie Diet", "High Calorie Diet", "No Special Diet")  # Custom legend labels
+    )
+
   # Color mapping for R² text
   color_map <- c("Low Diet" = "red", "High Diet" = "blue", "No Diet" = "gray")
   
@@ -346,18 +344,7 @@ for (vitamin in vitamin_vars) {
                hjust = 1, vjust = 1)
   }
   
-  # Convert ggplot to plotly interactive plot
-  interactive_plot <- ggplotly(scatter_plot, tooltip = "text")  # Use 'text' for hover information
-  
-  # Store the interactive plot in the list
-  interactive_plots[[vitamin]] <- interactive_plot
-  
-  # Print the interactive plot for this vitamin
-  print(interactive_plot)
+  # Print the scatter plot for this vitamin
+  print(scatter_plot)
 }
-
-# To view the interactive plot for each vitamin, simply call:
-interactive_plots$B1
-interactive_plots$B2
-interactive_plots$B6
 ```

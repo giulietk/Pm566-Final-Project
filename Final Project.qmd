@@ -390,83 +390,94 @@ These results show that while most participants are taking their recommended B v
 ### Figure 5. B Vitamin Levels vs Dietary Intake
 
 ```{r, message=FALSE, warning=FALSE, echo=FALSE}
-nutrient_vars <- c("Calories", "Carbohydrate", "Fat", "Protein")
-
-# List of vitamin variables to plot against
-vitamin_vars <- c("B1", "B2", "B6")
-
-# Define recommended values for B vitamins
-recommended_values <- list(
-  B1 = 1.2,
-  B2 = 1.3,
-  B6 = 1
-)
-
-# Initialize an empty list to store the interactive plots
-interactive_plots <- list()
-
-# Create interactive plots for each vitamin
-for (vitamin in vitamin_vars) {
-  plot_data_list <- list()  # List to store individual plot data
+create_scatter_plots <- function(data) {
+  # List of nutrient variables to plot
+  nutrient_vars <- c("Calories", "Carbohydrate", "Fat", "Protein")
   
-  # Loop through each nutrient variable to generate data and plot for the current vitamin
-  for (nutrient in nutrient_vars) {
-    if (nutrient %in% colnames(extracted_data) && vitamin %in% colnames(extracted_data)) {
+  # List of vitamin variables to plot against
+  vitamin_vars <- c("B1", "B2", "B6")
+  
+  # Define recommended values for B vitamins
+  recommended_values <- list(
+    B1 = 1.2,
+    B2 = 1.3,
+    B6 = 1
+  )
+  
+   # Loop through each vitamin to create separate grids
+  for (vitamin in vitamin_vars) {
+    # Prepare an empty list to store the plot data for this vitamin
+    plot_data_list <- list()
+    
+    # Loop through each nutrient variable
+    for (nutrient in nutrient_vars) {
+      # Check if the nutrient exists in the data
+      if (!nutrient %in% colnames(data)) {
+        message(paste("Nutrient variable", nutrient, "not found in the data. Skipping."))
+        next
+      }
       
-      # Prepare the data for modeling
-      temp_data <- extracted_data[, c(nutrient, vitamin)]
-      colnames(temp_data) <- c("Nutrient", "Vitamin")
-      
-      # Filter out missing and non-finite values
-      temp_data <- temp_data %>%
-        na.omit() %>%
-        filter(is.finite(Nutrient) & is.finite(Vitamin))
-      
-      # Fit a linear model and calculate R^2
-      if (nrow(temp_data) > 1) {
-        model <- lm(Vitamin ~ Nutrient, data = temp_data)
-        r_squared <- summary(model)$r.squared
+       # Check if vitamin exists in the data
+      if (vitamin %in% colnames(data)) {
+        # Prepare the data for modeling
+        temp_data <- data[, c(nutrient, vitamin)]
+        colnames(temp_data) <- c("Nutrient", "Vitamin")
         
-        # Create plot data for this nutrient vs. vitamin
-        plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
-          Nutrient = temp_data$Nutrient,
-          Vitamin = temp_data$Vitamin,
-          Vitamin_Name = vitamin,
-          Nutrient_Name = nutrient,
-          Recommended_Value = recommended_values[[vitamin]],
-          R_squared = r_squared
-        )
+        # Filter out missing and non-finite values
+        temp_data <- temp_data %>%
+          na.omit() %>%
+          filter(is.finite(Nutrient) & is.finite(Vitamin))
+        
+        # Check if there are enough data points for modeling
+        if (nrow(temp_data) > 1) {
+          # Fit a linear model and calculate R^2
+          model <- lm(Vitamin ~ Nutrient, data = temp_data)
+          r_squared <- summary(model)$r.squared
+          
+          # Add the necessary data for plotting, including the recommended values and R^2
+          plot_data_list[[length(plot_data_list) + 1]] <- data.frame(
+            Nutrient = temp_data$Nutrient,
+            Vitamin = temp_data$Vitamin,
+            Vitamin_Name = vitamin,
+            Nutrient_Name = nutrient,
+            Recommended_Value = recommended_values[[vitamin]],
+            R_squared = r_squared
+          )
+        } else {
+          message(paste("Not enough data points for", vitamin, "vs", nutrient))
+        }
+      } else {
+        message(paste("Vitamin variable", vitamin, "not found in the data. Skipping."))
       }
     }
   }
-  
-  # Combine all the data for this vitamin into a single data frame
-  plot_data <- bind_rows(plot_data_list)
-  
-  # Create the ggplot for this vitamin
-  scatter_plot <- ggplot(plot_data, aes(x = Nutrient, y = Vitamin)) +
-    geom_point_interactive(aes(color = Nutrient_Name, tooltip = paste("Nutrient:", Nutrient, "<br>Vitamin:", Vitamin))) +
-    geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Line of best fit
-    labs(x = "Dietary Intake", y = "B Vitamin Level") +
-    theme_minimal() +
-    facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +  # Free x-scale for each plot
-    theme(legend.title = element_blank(), strip.text = element_text(size = 12)) +
-    ggtitle(paste(vitamin, "Levels vs Dietary Intake")) +
-    geom_hline(data = plot_data, aes(yintercept = Recommended_Value),
-               linetype = "dashed", color = "red", linewidth = 0.7) +
-    geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))),
-              hjust = 1.1, vjust = 1.1, color = "black", size = 4, fontface = "italic") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
-  
-  # Convert ggplot to girafe interactive plot
-  interactive_plots[[vitamin]] <- girafe(ggobj = scatter_plot)
-}
-
-# Now interactive_plots contains three separate plots for B1, B2, and B6.
-# To view each plot, simply call:
-interactive_plots$B1
-interactive_plots$B2
-interactive_plots$B6
+        # Combine all the data for this vitamin into a single data frame
+    plot_data <- bind_rows(plot_data_list)
+    
+    # Create the scatter plot for this vitamin using facet_wrap
+    scatter_plot <- ggplot(plot_data, aes(x = Nutrient, y = Vitamin)) +
+      geom_point(aes(color = Nutrient_Name), alpha = 0.7) +
+      geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Line of best fit
+      labs(x = "Dietary Intake", y = "B Vitamin Level") +
+      theme_minimal() +
+      facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +  # Free x-scale for each plot
+      theme(legend.title = element_blank(), strip.text = element_text(size = 12)) +
+      ggtitle(paste(vitamin, "Levels vs Dietary Intake")) +
+      # Add the recommended value horizontal lines for each vitamin
+      geom_hline(data = plot_data, aes(yintercept = Recommended_Value),
+                 linetype = "dashed", color = "red", linewidth = 0.7) +
+      # Annotate the R^2 value on each plot
+      geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))), 
+                hjust = 1.1, vjust = 1.1, color = "black", size = 4, 
+                fontface = "italic") +
+      # Adjust x-axis text for readability
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+    
+    # Print the scatter plot for this vitamin
+    print(scatter_plot)
+      }    
+    # Call the function with your data
+create_scatter_plots(extracted_data)
 ```
 
 Regressions were fit for each caloric diet type to answer the question of whether diet impact B vitamin intake. B1 and B2 vitamins are more strongly associated with all of the macronutrient intakes than B6, with the highest correlation occurring between B1 and caloric intake an B1 and carbohydrate intake. Overall, this demonstrates that getting enough dietary nutrition is critical for B1 and B2 vitamin daily replenishment.
@@ -500,11 +511,15 @@ vitamin_vars <- c("B1", "B2", "B6")
 for (vitamin in vitamin_vars) {
   # Basic scatter plot with a linear model
   scatter_plot <- ggplot(plot_data, aes_string(x = "Calories", y = vitamin, color = "DietType")) +
-    geom_point() +
+    geom_point(alpha = 0.3) +  
     geom_smooth(method = "lm", aes(group = DietType), se = FALSE) +  # Linear model for each diet type
     labs(x = "Calories", y = paste("Vitamin", vitamin, "(mg)"), title = paste("Scatter Plot of Calories vs Vitamin", vitamin, "by Caloric Diet Type")) +
     theme_minimal() +
-    scale_color_manual(values = c("red", "blue", "grey"))
+    scale_color_manual(
+      values = c("Low Diet" = "red", "High Diet" = "blue", "No Diet" = "grey"),
+      name = "Diet Type",  # Title for the legend
+      labels = c("Low Calorie Diet", "High Calorie Diet", "No Special Diet")  # Custom legend labels
+    )
 
   # Color mapping for R² text
   color_map <- c("Low Diet" = "red", "High Diet" = "blue", "No Diet" = "gray")
