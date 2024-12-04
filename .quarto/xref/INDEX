@@ -3,9 +3,11 @@
     "index.html": "3ff972d1"
   },
   "about.qmd": {
-    "about.html": "f68ae1c6"
+    "about.html": "f68ae1c6",
+    "about.tex": "60f76710"
   },
   "Final Project.qmd": {
-    "Final Project.html": "1a8d6f69"
+    "Final Project.html": "1a8d6f69",
+    "Final-Project.tex": "905fb00d"
   }
 }
