@@ -480,7 +480,7 @@ create_scatter_plots <- function(data) {
 create_scatter_plots(extracted_data)
 ```
 
-Regressions were fit for each caloric diet type to answer the question of whether diet impact B vitamin intake. B1 and B2 vitamins are more strongly associated with all of the macronutrient intakes than B6, with the highest correlation occurring between B1 and caloric intake an B1 and carbohydrate intake. Overall, this demonstrates that getting enough dietary nutrition is critical for B1 and B2 vitamin daily replenishment.
+Regressions were fit for each diet type to answer the question of whether macronutrient consumption impacts B vitamin levels. B1 and B2 vitamins are more strongly associated with all of the macronutrient intakes than B6. The highest correlations occurred between B1 and caloric intake and B1 and carbohydrate intake. The red dashed lines are used to represent the recommended B vitamin intake levels for men of 1.2 mg of B1, 1.3 miligrams (mg) of B2 and 1.0 mg of B6 from Table 6. Overall, this demonstrates that getting enough dietary nutrition is critical for B1 and B2 vitamin daily replenishment.
 
 ### Figure 6. Caloric Diet's Effect on B vitamins
 
@@ -569,7 +569,7 @@ for (vitamin in vitamin_vars) {
 }
 ```
 
-B vitamins have a mild-to-moderate association with dietary intake. The high calorie diet in the graphs of vitamins B1 and B2 vs calories have the highest slopes, indicating that an intention to eat more calories is also associated with an increase in B vitamin intake. This finding makes sense given participants on a high calorie diet actually eat more calories and caloric intake was shown to be moderately associated with these B vitamin levels. Interestingly, caloric diet type's association with the B vitamins was not consistent between the vitamins, indicating that more than just than dietary intention is necessary for sufficient B vitamin intake.
+B vitamins have a mild-to-moderate association with dietary intake. The high calorie diet in the graphs of vitamins B1 and B2 vs calories have the highest slopes, indicating that an intention to eat more calories is also associated with an increase in B vitamin intake. This finding makes sense given participants on a high calorie diet actually eat more calories and caloric intake was shown to be moderately associated with these B vitamin levels. Interestingly, caloric diet type's association with the B vitamins was not consistent between the vitamins, indicating that more just than dietary intention is necessary for sufficient B vitamin intake.
 
 # Conclusion
 
