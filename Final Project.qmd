@@ -404,7 +404,7 @@ create_scatter_plots <- function(data) {
     B6 = 1
   )
   
-   # Loop through each vitamin to create separate grids
+  # Loop through each vitamin to create separate plots
   for (vitamin in vitamin_vars) {
     # Prepare an empty list to store the plot data for this vitamin
     plot_data_list <- list()
@@ -417,7 +417,7 @@ create_scatter_plots <- function(data) {
         next
       }
       
-       # Check if vitamin exists in the data
+      # Check if vitamin exists in the data
       if (vitamin %in% colnames(data)) {
         # Prepare the data for modeling
         temp_data <- data[, c(nutrient, vitamin)]
@@ -450,33 +450,40 @@ create_scatter_plots <- function(data) {
         message(paste("Vitamin variable", vitamin, "not found in the data. Skipping."))
       }
     }
-  }
-        # Combine all the data for this vitamin into a single data frame
+    
+    # Combine all the data for this vitamin into a single data frame
     plot_data <- bind_rows(plot_data_list)
     
-    # Create the scatter plot for this vitamin using facet_wrap
-    scatter_plot <- ggplot(plot_data, aes(x = Nutrient, y = Vitamin)) +
-      geom_point(aes(color = Nutrient_Name), alpha = 0.7) +
-      geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Line of best fit
-      labs(x = "Dietary Intake", y = "B Vitamin Level") +
-      theme_minimal() +
-      facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +  # Free x-scale for each plot
-      theme(legend.title = element_blank(), strip.text = element_text(size = 12)) +
-      ggtitle(paste(vitamin, "Levels vs Dietary Intake")) +
-      # Add the recommended value horizontal lines for each vitamin
-      geom_hline(data = plot_data, aes(yintercept = Recommended_Value),
-                 linetype = "dashed", color = "red", linewidth = 0.7) +
-      # Annotate the R^2 value on each plot
-      geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))), 
-                hjust = 1.1, vjust = 1.1, color = "black", size = 4, 
-                fontface = "italic") +
-      # Adjust x-axis text for readability
-      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
-    
-    # Print the scatter plot for this vitamin
-    print(scatter_plot)
-      }    
-    # Call the function with your data
+    # Check if there's data to plot
+    if (nrow(plot_data) > 0) {
+      # Create the scatter plot for this vitamin using facet_wrap
+      scatter_plot <- ggplot(plot_data, aes(x = Nutrient, y = Vitamin)) +
+        geom_point(aes(color = Nutrient_Name), alpha = 0.7) +
+        geom_smooth(method = "lm", se = FALSE, color = "blue") +  # Line of best fit
+        labs(x = "Dietary Intake", y = "B Vitamin Level") +
+        theme_minimal() +
+        facet_wrap(~Nutrient_Name, scales = "free", nrow = 2, ncol = 2) +  # Free x-scale for each plot
+        theme(legend.title = element_blank(), strip.text = element_text(size = 12)) +
+        ggtitle(paste(vitamin, "Levels vs Dietary Intake")) +
+        # Add the recommended value horizontal lines for each vitamin
+        geom_hline(data = plot_data, aes(yintercept = Recommended_Value),
+                   linetype = "dashed", color = "red", linewidth = 0.7) +
+        # Annotate the R^2 value on each plot
+        geom_text(aes(x = Inf, y = Inf, label = paste("R² =", round(R_squared, 2))), 
+                  hjust = 1.1, vjust = 1.1, color = "black", size = 4, 
+                  fontface = "italic") +
+        # Adjust x-axis text for readability
+        theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+      
+      # Print the scatter plot for this vitamin
+      print(scatter_plot)
+    } else {
+      message(paste("No data available for plotting", vitamin, "vs Nutrients."))
+    }
+  }
+}
+
+# Call the function with your data
 create_scatter_plots(extracted_data)
 ```
 
